@@ -2350,12 +2350,125 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
   var kaboom_default = xn();
 
   // code/main.js
-  kaboom_default();
+  var UNITS = 48;
+  var GRAVITY = 0.2;
+  var LAUNCH_ARROW_SPEED = 0.75;
+  var LAUNCH_ARROW_MIN_ANGLE = 0;
+  var LAUNCH_ARROW_MAX_ANGLE = 90;
+  var LAUNCH_ARROW_MAX_STRENGTH = 2;
+  var THROW_ARROW_SPEED = 2.5;
+  var launchState = "prelaunch";
+  var frozen = false;
+  var gravity = 0;
+  kaboom_default({ width: 36 * UNITS, height: 20 * UNITS });
   loadSprite("bean", "sprites/bean.png");
-  add([
+  loadSprite("arrow", "sprites/arrow.png");
+  var player = add([
+    "player",
     sprite("bean"),
-    pos(80, 40),
+    pos(2 * UNITS, height() - 5 * UNITS),
+    area(),
+    {
+      sideSpeed: 0,
+      upSpeed: 0
+    }
+  ]);
+  var launchArrow = add([
+    "launchArrow",
+    sprite("arrow"),
+    scale(0.5, 0.5),
+    rotate(0),
+    pos(2.5 * UNITS, height() - 4 * UNITS),
+    origin("center"),
     area()
   ]);
+  add([
+    "launch",
+    rect(4 * UNITS, 4 * UNITS),
+    pos(0, height() - 4 * UNITS),
+    area(),
+    solid(),
+    color(127, 200, 255)
+  ]);
+  add([
+    "land",
+    rect(24 * UNITS, 3 * UNITS),
+    pos(8 * UNITS, height() - 3 * UNITS),
+    area(),
+    solid(),
+    color(127, 255, 255)
+  ]);
+  var throwArrow = add([
+    "throwArrow",
+    sprite("arrow"),
+    scale(0.5, 0.5),
+    rotate(0),
+    pos(-2 * UNITS, -2 * UNITS),
+    origin("center"),
+    area()
+  ]);
+  mouseDown(() => {
+    if (launchState === "prelaunch") {
+      launchState = "launching";
+    }
+  });
+  mouseRelease(() => {
+    if (launchState === "launching") {
+      launchState = "launched";
+      const start = vec2(0, 0);
+      const end = start.add(dir(LAUNCH_ARROW_MAX_ANGLE - launchArrow.angle).scale(launchArrow.scale.scale(10)));
+      player.sideSpeed = end.x;
+      player.upSpeed = end.y;
+      gravity = GRAVITY;
+    }
+  });
+  var startThrow = /* @__PURE__ */ __name(() => {
+    frozen = true;
+    throwArrow.pos = player.pos.add(0.5 * UNITS, 0.5 * UNITS);
+  }, "startThrow");
+  mouseClick(() => {
+    if (launchState === "launched") {
+      startThrow();
+    }
+  });
+  collides("player", "land", () => {
+    launchState = "landed";
+    player.sideSpeed = 0;
+    player.upSpeed = 0;
+    gravity = 0;
+    shake();
+  });
+  player.action(() => {
+    if (!frozen) {
+      player.moveBy(player.sideSpeed, -player.upSpeed);
+      player.upSpeed -= gravity;
+    }
+  });
+  var direction = 1;
+  launchArrow.action(() => {
+    if (launchState === "prelaunch") {
+      if (launchArrow.angle <= LAUNCH_ARROW_MIN_ANGLE) {
+        direction = 1;
+      } else if (launchArrow.angle >= LAUNCH_ARROW_MAX_ANGLE) {
+        direction = -1;
+      }
+      launchArrow.angle = launchArrow.angle + direction * LAUNCH_ARROW_SPEED;
+    } else if (launchState === "launching") {
+      if (launchArrow.scale.x <= LAUNCH_ARROW_MAX_STRENGTH) {
+        launchArrow.scale = launchArrow.scale.add(0.01, 0.01);
+      }
+    } else if (launchState === "launched") {
+      launchArrow.destroy();
+    }
+  });
+  throwArrow.action(() => {
+    if (frozen) {
+      throwArrow.angle += THROW_ARROW_SPEED;
+      if (throwArrow.angle === 360) {
+        frozen = false;
+        throwArrow.destroy();
+      }
+    }
+  });
 })();
 //# sourceMappingURL=game.js.map
