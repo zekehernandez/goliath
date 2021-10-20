@@ -460,12 +460,12 @@
         throw new Error(g);
       if (g = e.getShaderInfoLog(z))
         throw new Error(g);
-      let k = e.createProgram();
-      if (e.attachShader(k, R), e.attachShader(k, z), e.bindAttribLocation(k, 0, "a_pos"), e.bindAttribLocation(k, 1, "a_uv"), e.bindAttribLocation(k, 2, "a_color"), e.linkProgram(k), (g = e.getProgramInfoLog(k)) && g !== `
+      let k2 = e.createProgram();
+      if (e.attachShader(k2, R), e.attachShader(k2, z), e.bindAttribLocation(k2, 0, "a_pos"), e.bindAttribLocation(k2, 1, "a_uv"), e.bindAttribLocation(k2, 2, "a_color"), e.linkProgram(k2), (g = e.getProgramInfoLog(k2)) && g !== `
 `)
         throw new Error(g);
       return { bind() {
-        e.useProgram(k);
+        e.useProgram(k2);
       }, unbind() {
         e.useProgram(null);
       }, bindAttribs() {
@@ -473,7 +473,7 @@
       }, send(T) {
         this.bind();
         for (let Q in T) {
-          let q = T[Q], K = e.getUniformLocation(k, Q);
+          let q = T[Q], K = e.getUniformLocation(k2, Q);
           typeof q == "number" ? e.uniform1f(K, q) : kt(q) ? e.uniformMatrix4fv(K, false, new Float32Array(q.m)) : We(q) ? e.uniform4f(K, q.r, q.g, q.b, q.a) : At(q) ? e.uniform3f(K, q.x, q.y, q.z) : Fe(q) && e.uniform2f(K, q.x, q.y);
         }
         this.unbind();
@@ -482,20 +482,20 @@
     __name(P, "P");
     s(P, "makeProgram");
     function w(l, y, g, v) {
-      let A = l.width / y, R = l.height / g, z = 1 / A, k = 1 / R, T = {}, Q = v.split("").entries();
+      let A = l.width / y, R = l.height / g, z = 1 / A, k2 = 1 / R, T = {}, Q = v.split("").entries();
       for (let [q, K] of Q)
-        T[K] = u(q % A * z, Math.floor(q / A) * k);
-      return { tex: l, map: T, qw: z, qh: k };
+        T[K] = u(q % A * z, Math.floor(q / A) * k2);
+      return { tex: l, map: T, qw: z, qh: k2 };
     }
     __name(w, "w");
     s(w, "makeFont");
     function C(l, y, g = t.defTex, v = t.defProg, A = {}) {
       g = g != null ? g : t.defTex, v = v != null ? v : t.defProg, (g !== t.curTex || v !== t.curProg || !pt(t.curUniform, A) || t.vqueue.length + l.length * Ye > tt || t.iqueue.length + y.length > tt) && S(), t.curTex = g, t.curProg = v, t.curUniform = A;
-      let R = y.map((k) => k + t.vqueue.length / Ye), z = l.map((k) => {
-        let T = G(t.transform.multVec2(k.pos.xy()));
-        return [T.x, T.y, k.pos.z, k.uv.x, k.uv.y, k.color.r / 255, k.color.g / 255, k.color.b / 255, k.opacity];
+      let R = y.map((k2) => k2 + t.vqueue.length / Ye), z = l.map((k2) => {
+        let T = G(t.transform.multVec2(k2.pos.xy()));
+        return [T.x, T.y, k2.pos.z, k2.uv.x, k2.uv.y, k2.color.r / 255, k2.color.g / 255, k2.color.b / 255, k2.opacity];
       }).flat();
-      R.forEach((k) => t.iqueue.push(k)), z.forEach((k) => t.vqueue.push(k));
+      R.forEach((k2) => t.iqueue.push(k2)), z.forEach((k2) => t.vqueue.push(k2));
     }
     __name(C, "C");
     s(C, "drawRaw");
@@ -566,8 +566,8 @@
     s(D, "popTransform");
     function E(l = {}) {
       var K, oe, ge, ae, ye, Ue;
-      let y = l.width || 0, g = l.height || 0, v = l.pos || u(0, 0), R = Xe(l.origin || et).scale(u(y, g).scale(-0.5)), z = u((K = l.scale) != null ? K : 1), k = l.rot || 0, T = l.quad || he(0, 0, 1, 1), Q = 1 - ((oe = l.z) != null ? oe : 0), q = l.color || H();
-      pe(), O(v), m(k), j(z), O(R), C([{ pos: we(-y / 2, g / 2, Q), uv: u(l.flipX ? T.x + T.w : T.x, l.flipY ? T.y : T.y + T.h), color: q, opacity: (ge = l.opacity) != null ? ge : 1 }, { pos: we(-y / 2, -g / 2, Q), uv: u(l.flipX ? T.x + T.w : T.x, l.flipY ? T.y + T.h : T.y), color: q, opacity: (ae = l.opacity) != null ? ae : 1 }, { pos: we(y / 2, -g / 2, Q), uv: u(l.flipX ? T.x : T.x + T.w, l.flipY ? T.y + T.h : T.y), color: q, opacity: (ye = l.opacity) != null ? ye : 1 }, { pos: we(y / 2, g / 2, Q), uv: u(l.flipX ? T.x : T.x + T.w, l.flipY ? T.y : T.y + T.h), color: q, opacity: (Ue = l.opacity) != null ? Ue : 1 }], [0, 1, 3, 1, 2, 3], l.tex, l.prog, l.uniform), D();
+      let y = l.width || 0, g = l.height || 0, v = l.pos || u(0, 0), R = Xe(l.origin || et).scale(u(y, g).scale(-0.5)), z = u((K = l.scale) != null ? K : 1), k2 = l.rot || 0, T = l.quad || he(0, 0, 1, 1), Q = 1 - ((oe = l.z) != null ? oe : 0), q = l.color || H();
+      pe(), O(v), m(k2), j(z), O(R), C([{ pos: we(-y / 2, g / 2, Q), uv: u(l.flipX ? T.x + T.w : T.x, l.flipY ? T.y : T.y + T.h), color: q, opacity: (ge = l.opacity) != null ? ge : 1 }, { pos: we(-y / 2, -g / 2, Q), uv: u(l.flipX ? T.x + T.w : T.x, l.flipY ? T.y + T.h : T.y), color: q, opacity: (ae = l.opacity) != null ? ae : 1 }, { pos: we(y / 2, -g / 2, Q), uv: u(l.flipX ? T.x : T.x + T.w, l.flipY ? T.y + T.h : T.y), color: q, opacity: (ye = l.opacity) != null ? ye : 1 }, { pos: we(y / 2, g / 2, Q), uv: u(l.flipX ? T.x : T.x + T.w, l.flipY ? T.y : T.y + T.h), color: q, opacity: (Ue = l.opacity) != null ? Ue : 1 }], [0, 1, 3, 1, 2, 3], l.tex, l.prog, l.uniform), D();
     }
     __name(E, "E");
     s(E, "drawQuad");
@@ -575,8 +575,8 @@
       var z;
       let g = (z = y.quad) != null ? z : he(0, 0, 1, 1), v = l.width * g.w, A = l.height * g.h, R = u(1);
       if (y.tiled) {
-        let k = Math.ceil((y.width || v) / v), T = Math.ceil((y.height || A) / A), q = Xe(y.origin || et).add(u(1, 1)).scale(0.5).scale(k * v, T * A);
-        for (let K = 0; K < k; K++)
+        let k2 = Math.ceil((y.width || v) / v), T = Math.ceil((y.height || A) / A), q = Xe(y.origin || et).add(u(1, 1)).scale(0.5).scale(k2 * v, T * A);
+        for (let K = 0; K < k2; K++)
           for (let oe = 0; oe < T; oe++)
             E(Re(Ce({}, y), { pos: (y.pos || u(0)).add(u(v * K, A * oe)).sub(q), scale: R.scale(y.scale || u(1)), tex: l, quad: g, width: v, height: A, origin: "topleft" }));
       } else
@@ -594,8 +594,8 @@
         let Q = u(v.scale);
         y = y * Q.x, g = g * Q.y, v.scale = 1;
       }
-      let A = Xe(v.origin || et).scale(u(y, g)).scale(0.5), R = l.add(u(-y / 2, -g / 2)).sub(A), z = l.add(u(-y / 2, g / 2)).sub(A), k = l.add(u(y / 2, g / 2)).sub(A), T = l.add(u(y / 2, -g / 2)).sub(A);
-      W(R, z, v), W(z, k, v), W(k, T, v), W(T, R, v);
+      let A = Xe(v.origin || et).scale(u(y, g)).scale(0.5), R = l.add(u(-y / 2, -g / 2)).sub(A), z = l.add(u(-y / 2, g / 2)).sub(A), k2 = l.add(u(y / 2, g / 2)).sub(A), T = l.add(u(y / 2, -g / 2)).sub(A);
+      W(R, z, v), W(z, k2, v), W(k2, T, v), W(T, R, v);
     }
     __name(_, "_");
     s(_, "drawRectStroke");
@@ -606,14 +606,14 @@
     __name(W, "W");
     s(W, "drawLine");
     function V(l, y, g, v = {}) {
-      var z, k, T;
+      var z, k2, T;
       let A = v.z, R = v.color || H();
-      C([{ pos: we(l.x, l.y, A), uv: u(0, 0), color: R, opacity: (z = v.opacity) != null ? z : 1 }, { pos: we(y.x, y.y, A), uv: u(0, 0), color: R, opacity: (k = v.opacity) != null ? k : 1 }, { pos: we(g.x, g.y, A), uv: u(0, 0), color: R, opacity: (T = v.opacity) != null ? T : 1 }], [0, 1, 2], t.defTex, v.prog, v.uniform);
+      C([{ pos: we(l.x, l.y, A), uv: u(0, 0), color: R, opacity: (z = v.opacity) != null ? z : 1 }, { pos: we(y.x, y.y, A), uv: u(0, 0), color: R, opacity: (k2 = v.opacity) != null ? k2 : 1 }, { pos: we(g.x, g.y, A), uv: u(0, 0), color: R, opacity: (T = v.opacity) != null ? T : 1 }], [0, 1, 2], t.defTex, v.prog, v.uniform);
     }
     __name(V, "V");
     s(V, "drawTri");
     function F(l, y, g = {}) {
-      let v = (l + "").split(""), A = y.qw * y.tex.width, R = y.qh * y.tex.height, z = g.size || R, k = u(z / R).scale(u(g.scale || 1)), T = k.x * A, Q = k.y * R, q = 0, K = Q, oe = 0, ge = [], ae = [], ye = null, Ue = 0;
+      let v = (l + "").split(""), A = y.qw * y.tex.width, R = y.qh * y.tex.height, z = g.size || R, k2 = u(z / R).scale(u(g.scale || 1)), T = k2.x * A, Q = k2.y * R, q = 0, K = Q, oe = 0, ge = [], ae = [], ye = null, Ue = 0;
       for (; Ue < v.length; ) {
         let be = v[Ue];
         be === `
@@ -626,7 +626,7 @@
         let Ze = (oe - be.length * T) * (ve.x + 0.5);
         be.forEach((Ge, Je) => {
           let Ie = y.map[Ge], st = Je * T, it = nt * Q;
-          Ie && Ee.push({ tex: y.tex, quad: he(Ie.x, Ie.y, y.qw, y.qh), ch: Ge, pos: u(xe.x + st + Ve + Ze, xe.y + it + rt), opacity: g.opacity, color: g.color, origin: g.origin, scale: k });
+          Ie && Ee.push({ tex: y.tex, quad: he(Ie.x, Ie.y, y.qw, y.qh), ch: Ge, pos: u(xe.x + st + Ve + Ze, xe.y + it + rt), opacity: g.opacity, color: g.color, origin: g.origin, scale: k2 });
         });
       }), { width: oe, height: K, chars: Ee };
     }
@@ -1599,15 +1599,15 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       }
       __name(z, "z");
       s(z, "keyPressRep");
-      function k(n, i) {
+      function k2(n, i) {
         if (Array.isArray(n)) {
-          let o = n.map((d) => k(d, i));
+          let o = n.map((d) => k2(d, i));
           return () => o.forEach((d) => d());
         } else
           return typeof n == "function" ? m.on("input", () => t.keyPressed() && n()) : m.on("input", () => t.keyReleased(n) && i());
       }
-      __name(k, "k");
-      s(k, "keyRelease");
+      __name(k2, "k");
+      s(k2, "keyRelease");
       function T(n) {
         return m.on("input", () => t.mouseDown() && n(G()));
       }
@@ -2318,7 +2318,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       }
       __name(Hr, "Hr");
       s(Hr, "addLevel");
-      let Me = { loadRoot: w.loadRoot, loadSprite: w.loadSprite, loadSpriteAtlas: w.loadSpriteAtlas, loadSound: w.loadSound, loadFont: w.loadFont, loadShader: w.loadShader, loadAseprite: w.loadAseprite, loadPedit: w.loadPedit, loadBean: w.loadBean, load: w.load, width: x, height: P, center: ut, dt: X, time: t.time, screenshot: t.screenshot, focused: t.focused, focus: t.focus, cursor: t.cursor, regCursor: nt, fullscreen: t.fullscreen, ready: Le, isTouch: () => t.isTouch, layers: pe, camPos: D, camScale: E, camRot: M, shake: J, toScreen: _, toWorld: W, gravity: be, add: p, readd: $, destroy: Ve, destroyAll: rt, get: Ee, every: xe, revery: ve, pos: Je, scale: Ie, rotate: st, color: it, opacity: vr, origin: Br, layer: Cr, area: Rr, sprite: Ar, text: kr, rect: Vr, outline: Ir, body: Wr, shader: Xr, timer: Mr, solid: Lr, fixed: qr, stay: $r, health: Yr, lifespan: zr, z: Pr, move: Dr, cleanup: Tr, follow: Sr, on: ce, action: ie, render: N, collides: ze, clicks: l, hovers: y, keyDown: A, keyPress: R, keyPressRep: z, keyRelease: k, mouseDown: T, mouseClick: Q, mouseRelease: q, mouseMove: K, charInput: oe, touchStart: ge, touchMove: ae, touchEnd: ye, mousePos: G, mouseWorldPos: re, mouseDeltaPos: t.mouseDeltaPos, keyIsDown: t.keyDown, keyIsPressed: t.keyPressed, keyIsPressedRep: t.keyPressedRep, keyIsReleased: t.keyReleased, mouseIsDown: t.mouseDown, mouseIsClicked: t.mouseClicked, mouseIsReleased: t.mouseReleased, mouseIsMoved: t.mouseMoved, loop: v, wait: g, play: ee, volume: r.volume, burp: r.burp, audioCtx: r.ctx, rng: ft, rand: $e, randi: mt, randSeed: Mt, vec2: u, dir: je, rgb: H, quad: he, choose: Ft, chance: _t, lerp: qe, map: Ae, mapc: Rt, wave: Vt, deg2rad: _e, rad2deg: ht, colLineLine: Lt, colRectRect: Oe, drawSprite: O, drawText: j, drawRect: c.drawRect, drawRectStroke: c.drawRectStroke, drawLine: c.drawLine, drawTri: c.drawTri, debug: ne, scene: Zr, go: Gr, addLevel: Hr, getData: Jr, setData: wt, plug: at, ASCII_CHARS: xt, CP437_CHARS: dr, LEFT: u(-1, 0), RIGHT: u(1, 0), UP: u(0, -1), DOWN: u(0, 1), canvas: t.canvas };
+      let Me = { loadRoot: w.loadRoot, loadSprite: w.loadSprite, loadSpriteAtlas: w.loadSpriteAtlas, loadSound: w.loadSound, loadFont: w.loadFont, loadShader: w.loadShader, loadAseprite: w.loadAseprite, loadPedit: w.loadPedit, loadBean: w.loadBean, load: w.load, width: x, height: P, center: ut, dt: X, time: t.time, screenshot: t.screenshot, focused: t.focused, focus: t.focus, cursor: t.cursor, regCursor: nt, fullscreen: t.fullscreen, ready: Le, isTouch: () => t.isTouch, layers: pe, camPos: D, camScale: E, camRot: M, shake: J, toScreen: _, toWorld: W, gravity: be, add: p, readd: $, destroy: Ve, destroyAll: rt, get: Ee, every: xe, revery: ve, pos: Je, scale: Ie, rotate: st, color: it, opacity: vr, origin: Br, layer: Cr, area: Rr, sprite: Ar, text: kr, rect: Vr, outline: Ir, body: Wr, shader: Xr, timer: Mr, solid: Lr, fixed: qr, stay: $r, health: Yr, lifespan: zr, z: Pr, move: Dr, cleanup: Tr, follow: Sr, on: ce, action: ie, render: N, collides: ze, clicks: l, hovers: y, keyDown: A, keyPress: R, keyPressRep: z, keyRelease: k2, mouseDown: T, mouseClick: Q, mouseRelease: q, mouseMove: K, charInput: oe, touchStart: ge, touchMove: ae, touchEnd: ye, mousePos: G, mouseWorldPos: re, mouseDeltaPos: t.mouseDeltaPos, keyIsDown: t.keyDown, keyIsPressed: t.keyPressed, keyIsPressedRep: t.keyPressedRep, keyIsReleased: t.keyReleased, mouseIsDown: t.mouseDown, mouseIsClicked: t.mouseClicked, mouseIsReleased: t.mouseReleased, mouseIsMoved: t.mouseMoved, loop: v, wait: g, play: ee, volume: r.volume, burp: r.burp, audioCtx: r.ctx, rng: ft, rand: $e, randi: mt, randSeed: Mt, vec2: u, dir: je, rgb: H, quad: he, choose: Ft, chance: _t, lerp: qe, map: Ae, mapc: Rt, wave: Vt, deg2rad: _e, rad2deg: ht, colLineLine: Lt, colRectRect: Oe, drawSprite: O, drawText: j, drawRect: c.drawRect, drawRectStroke: c.drawRectStroke, drawLine: c.drawLine, drawTri: c.drawTri, debug: ne, scene: Zr, go: Gr, addLevel: Hr, getData: Jr, setData: wt, plug: at, ASCII_CHARS: xt, CP437_CHARS: dr, LEFT: u(-1, 0), RIGHT: u(1, 0), UP: u(0, -1), DOWN: u(0, 1), canvas: t.canvas };
       if (at(gr), e.plugins && e.plugins.forEach(at), e.global !== false)
         for (let n in Me)
           window[n] = Me[n];
@@ -2349,8 +2349,14 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
   });
   var kaboom_default = xn();
 
-  // code/main.js
+  // code/constants.js
   var UNITS = 48;
+
+  // code/kaboom.js
+  var k = kaboom_default({ width: 36 * UNITS, height: 20 * UNITS, font: "sink" });
+  var kaboom_default2 = k;
+
+  // code/scenes/game.js
   var GRAVITY = 0.2;
   var SLOW_MO_MODIFIER = 0.075;
   var LAUNCH_ARROW_SPEED = 0.75;
@@ -2362,182 +2368,248 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
   var THROW_ARROW_SPEED = 2;
   var BLADE_SPEED = 500;
   var BLADE_START_DISTANCE = 50;
-  var launchState = "prelaunch";
-  var slomo = false;
-  var gravity = 0;
-  var speedModifier = /* @__PURE__ */ __name(() => slomo ? SLOW_MO_MODIFIER : 1, "speedModifier");
-  kaboom_default({ width: 36 * UNITS, height: 20 * UNITS });
-  loadSprite("bean", "sprites/bean.png");
-  loadSprite("arrow", "sprites/arrow.png");
-  var player = add([
-    "player",
-    sprite("bean"),
-    pos(2 * UNITS, height() - 5 * UNITS),
-    area(),
-    {
-      sideSpeed: 0,
-      upSpeed: 0
-    }
-  ]);
-  var launchArrow = add([
-    "launchArrow",
-    sprite("arrow"),
-    scale(0.5, 0.5),
-    rotate(0),
-    pos(2.5 * UNITS, height() - 4 * UNITS),
-    origin("center"),
-    area()
-  ]);
-  add([
-    "launch",
-    rect(4 * UNITS, 4 * UNITS),
-    pos(0, height() - 4 * UNITS),
-    area(),
-    solid(),
-    outline(),
-    color(127, 200, 255)
-  ]);
-  add([
-    "land",
-    rect(24 * UNITS, 3 * UNITS),
-    pos(8 * UNITS, height() - 3 * UNITS),
-    area(),
-    solid(),
-    outline(),
-    color(127, 255, 255)
-  ]);
-  var throwArrow = add([
-    "throwArrow",
-    sprite("arrow"),
-    scale(0.5, 0.5),
-    rotate(0),
-    pos(-2 * UNITS, -2 * UNITS),
-    origin("center"),
-    area(),
-    opacity(0)
-  ]);
-  add([
-    "enemy",
-    rect(1 * UNITS, 2 * UNITS),
-    pos(10 * UNITS, height() - 5 * UNITS),
-    area(),
-    body(),
-    color(60, 230, 110),
-    outline()
-  ]);
-  add([
-    "enemy",
-    rect(1 * UNITS, 2 * UNITS),
-    pos(18 * UNITS, height() - 5 * UNITS),
-    area(),
-    body(),
-    color(60, 230, 110),
-    outline()
-  ]);
-  add([
-    "enemy",
-    rect(1 * UNITS, 2 * UNITS),
-    pos(24 * UNITS, height() - 5 * UNITS),
-    area(),
-    body(),
-    color(60, 230, 110),
-    outline()
-  ]);
-  var startThrow = /* @__PURE__ */ __name(() => {
-    slomo = true;
-    throwArrow.opacity = 1;
-    throwArrow.pos = player.pos.add(0.5 * UNITS, 0.5 * UNITS);
-  }, "startThrow");
-  var throwBlade = /* @__PURE__ */ __name(() => {
-    const bladePos = throwArrow.pos.add(dir(throwArrow.angle - 90).scale(BLADE_START_DISTANCE));
+  kaboom_default2.scene("game", (args = {}) => {
+    let launchState = "prelaunch";
+    let slowMo = false;
+    let gravity = 0;
+    let previousMouseDown = mouseIsDown();
+    const speedModifier = /* @__PURE__ */ __name(() => slowMo ? SLOW_MO_MODIFIER : 1, "speedModifier");
     add([
-      "blade",
-      rect(10, 10),
+      "sky",
+      rect(width(), height()),
+      color(220, 240, 255)
+    ]);
+    const overlay = add([
+      rect(width(), height()),
+      color(0, 0, 0),
+      opacity(0)
+    ]);
+    overlay.action(() => {
+      if (slowMo) {
+        overlay.opacity = wave(0, 0.25, 1e3);
+      } else {
+        overlay.color = rgb(0, 0, 0);
+        overlay.opacity = 0;
+      }
+    });
+    const player = add([
+      "player",
+      sprite("bean"),
+      pos(2 * UNITS, height() - 5 * UNITS),
       area(),
-      pos(bladePos),
       {
-        speed: BLADE_SPEED,
-        throwAngle: throwArrow.angle - 90
+        sideSpeed: 0,
+        upSpeed: 0
       }
     ]);
-  }, "throwBlade");
-  var gameAction = /* @__PURE__ */ __name(() => {
-    if (launchState === "launched" && !slomo) {
-      startThrow();
-    } else if (slomo) {
-      throwBlade();
-    }
-  }, "gameAction");
-  var actionDown = /* @__PURE__ */ __name(() => {
-    if (launchState === "prelaunch") {
-      launchState = "launching";
-    }
-  }, "actionDown");
-  var actionUp = /* @__PURE__ */ __name(() => {
-    if (launchState === "launching") {
-      launchState = "launched";
-      const start = vec2(0, 0);
-      const end = start.add(dir(LAUNCH_ARROW_MAX_ANGLE - launchArrow.angle).scale(launchArrow.scale.scale(LAUNCH_ARROW_STRENGTH_MODIFIER)));
-      player.sideSpeed = end.x;
-      player.upSpeed = end.y;
-      gravity = GRAVITY;
-    }
-  }, "actionUp");
-  mouseDown(actionDown);
-  mouseRelease(actionUp);
-  mouseClick(gameAction);
-  keyDown("space", actionDown);
-  keyRelease("space", actionUp);
-  keyPress("space", gameAction);
-  collides("player", "land", () => {
-    launchState = "landed";
-    player.sideSpeed = 0;
-    player.upSpeed = 0;
-    gravity = 0;
-    shake();
-  });
-  collides("blade", "enemy", (blade) => {
-    blade.speed = 0;
-    shake();
-  });
-  collides("blade", "land", (blade) => {
-    blade.speed = 0;
-  });
-  action("blade", (blade) => {
-    blade.move(dir(blade.throwAngle).scale(blade.speed * speedModifier()));
-  });
-  player.action(() => {
-    player.moveBy(player.sideSpeed * speedModifier(), -player.upSpeed * speedModifier());
-    if (!slomo) {
-      player.upSpeed -= gravity;
-    }
-  });
-  var direction = 1;
-  launchArrow.action(() => {
-    if (launchState === "prelaunch") {
-      if (launchArrow.angle <= LAUNCH_ARROW_MIN_ANGLE) {
-        direction = 1;
-      } else if (launchArrow.angle >= LAUNCH_ARROW_MAX_ANGLE) {
-        direction = -1;
+    const launchArrow = add([
+      "launchArrow",
+      sprite("arrow"),
+      scale(0.5, 0.5),
+      rotate(0),
+      pos(2.5 * UNITS, height() - 4 * UNITS),
+      origin("center"),
+      area()
+    ]);
+    add([
+      "launch",
+      rect(4 * UNITS, 4 * UNITS),
+      pos(0, height() - 4 * UNITS),
+      area(),
+      solid(),
+      outline(),
+      color(127, 200, 255)
+    ]);
+    add([
+      "land",
+      rect(24 * UNITS, 3 * UNITS),
+      pos(8 * UNITS, height() - 3 * UNITS),
+      area(),
+      solid(),
+      outline(),
+      color(127, 255, 255)
+    ]);
+    const throwArrow = add([
+      "throwArrow",
+      sprite("arrow"),
+      scale(0.5, 0.5),
+      rotate(0),
+      pos(-2 * UNITS, -2 * UNITS),
+      origin("center"),
+      area(),
+      opacity(0)
+    ]);
+    add([
+      "enemy",
+      rect(1 * UNITS, 2 * UNITS),
+      pos(10 * UNITS, height() - 5 * UNITS),
+      area(),
+      body(),
+      color(60, 230, 110),
+      outline()
+    ]);
+    add([
+      "enemy",
+      rect(1 * UNITS, 2 * UNITS),
+      pos(18 * UNITS, height() - 5 * UNITS),
+      area(),
+      body(),
+      color(60, 230, 110),
+      outline()
+    ]);
+    add([
+      "enemy",
+      rect(1 * UNITS, 2 * UNITS),
+      pos(24 * UNITS, height() - 5 * UNITS),
+      area(),
+      body(),
+      color(60, 230, 110),
+      outline()
+    ]);
+    const startThrow = /* @__PURE__ */ __name(() => {
+      slowMo = true;
+      throwArrow.opacity = 1;
+      throwArrow.pos = player.pos.add(0.5 * UNITS, 0.5 * UNITS);
+    }, "startThrow");
+    const throwBlade = /* @__PURE__ */ __name(() => {
+      const bladePos = throwArrow.pos.add(dir(throwArrow.angle - 90).scale(BLADE_START_DISTANCE));
+      add([
+        "blade",
+        rect(10, 10),
+        area(),
+        pos(bladePos),
+        {
+          speed: BLADE_SPEED,
+          throwAngle: throwArrow.angle - 90
+        }
+      ]);
+    }, "throwBlade");
+    const gameAction = /* @__PURE__ */ __name(() => {
+      if (launchState === "launched" && !slowMo) {
+        startThrow();
+      } else if (slowMo) {
+        throwBlade();
       }
-      launchArrow.angle = launchArrow.angle + direction * LAUNCH_ARROW_SPEED;
-    } else if (launchState === "launching") {
-      if (launchArrow.scale.x <= LAUNCH_ARROW_MAX_STRENGTH) {
-        launchArrow.scale = launchArrow.scale.add(LAUNCH_ARROW_STRENGHT_SPEED, LAUNCH_ARROW_STRENGHT_SPEED);
+    }, "gameAction");
+    const actionDown = /* @__PURE__ */ __name(() => {
+      if (launchState === "prelaunch") {
+        launchState = "launching";
       }
-    } else if (launchState === "launched") {
-      launchArrow.destroy();
-    }
-  });
-  throwArrow.action(() => {
-    if (slomo) {
-      throwArrow.angle += THROW_ARROW_SPEED;
-      if (throwArrow.angle === 360) {
-        slomo = false;
-        throwArrow.destroy();
+    }, "actionDown");
+    const actionUp = /* @__PURE__ */ __name(() => {
+      if (launchState === "launching") {
+        launchState = "launched";
+        const start = vec2(0, 0);
+        const end = start.add(dir(LAUNCH_ARROW_MAX_ANGLE - launchArrow.angle).scale(launchArrow.scale.scale(LAUNCH_ARROW_STRENGTH_MODIFIER)));
+        player.sideSpeed = end.x;
+        player.upSpeed = end.y;
+        gravity = GRAVITY;
       }
-    }
-    throwArrow.pos = player.pos.add(0.5 * UNITS, 0.5 * UNITS);
+    }, "actionUp");
+    const doMouseDown = /* @__PURE__ */ __name(() => {
+      if (!previousMouseDown) {
+        actionDown();
+      }
+    }, "doMouseDown");
+    const doMouseUp = /* @__PURE__ */ __name(() => {
+      if (previousMouseDown) {
+        previousMouseDown = false;
+      } else {
+        actionUp();
+      }
+    }, "doMouseUp");
+    mouseDown(doMouseDown);
+    mouseRelease(doMouseUp);
+    mouseClick(gameAction);
+    keyDown("space", actionDown);
+    keyRelease("space", actionUp);
+    keyPress("space", gameAction);
+    keyPress("tab", () => kaboom_default2.go("game"));
+    collides("player", "land", () => {
+      launchState = "landed";
+      player.sideSpeed = 0;
+      player.upSpeed = 0;
+      gravity = 0;
+      shake(20);
+    });
+    collides("blade", "enemy", (blade) => {
+      blade.speed = 0;
+      shake(10);
+    });
+    collides("blade", "land", (blade) => {
+      blade.speed = 0;
+    });
+    action("blade", (blade) => {
+      blade.move(dir(blade.throwAngle).scale(blade.speed * speedModifier()));
+    });
+    player.action(() => {
+      player.moveBy(player.sideSpeed * speedModifier(), -player.upSpeed * speedModifier());
+      if (!slowMo) {
+        player.upSpeed -= gravity;
+      }
+    });
+    let direction = 1;
+    launchArrow.action(() => {
+      if (launchState === "prelaunch") {
+        if (launchArrow.angle <= LAUNCH_ARROW_MIN_ANGLE) {
+          direction = 1;
+        } else if (launchArrow.angle >= LAUNCH_ARROW_MAX_ANGLE) {
+          direction = -1;
+        }
+        launchArrow.angle = launchArrow.angle + direction * LAUNCH_ARROW_SPEED;
+      } else if (launchState === "launching") {
+        if (launchArrow.scale.x <= LAUNCH_ARROW_MAX_STRENGTH) {
+          launchArrow.scale = launchArrow.scale.add(LAUNCH_ARROW_STRENGHT_SPEED, LAUNCH_ARROW_STRENGHT_SPEED);
+        }
+      } else if (launchState === "launched") {
+        launchArrow.destroy();
+      }
+    });
+    throwArrow.action(() => {
+      if (slowMo) {
+        throwArrow.angle += THROW_ARROW_SPEED;
+        if (throwArrow.angle === 360) {
+          slowMo = false;
+          throwArrow.destroy();
+        }
+      }
+      throwArrow.pos = player.pos.add(0.5 * UNITS, 0.5 * UNITS);
+    });
   });
+
+  // code/scenes/title.js
+  kaboom_default2.scene("title", (args = {}) => {
+    add([
+      "background",
+      rect(width(), height()),
+      color(20, 20, 40)
+    ]);
+    add([
+      "title",
+      text("Throwing Star", { size: 60 }),
+      origin("center"),
+      pos(center().x, center().y - 100)
+    ]);
+    const cta = add([
+      "cta",
+      text("Click to begin", { size: 30 }),
+      origin("center"),
+      pos(center().x, center().y + 50),
+      opacity(0)
+    ]);
+    loop(0.75, () => {
+      if (cta.opacity === 0) {
+        cta.opacity = 1;
+      } else {
+        cta.opacity = 0;
+      }
+    });
+    mouseClick(() => kaboom_default2.go("game"));
+  });
+
+  // code/main.js
+  kaboom_default2.loadSprite("bean", "sprites/bean.png");
+  kaboom_default2.loadSprite("arrow", "sprites/arrow.png");
+  kaboom_default2.go("title");
 })();
 //# sourceMappingURL=game.js.map
