@@ -3,20 +3,29 @@ import kaboom from "kaboom";
 // general game consts
 const UNITS = 48;
 const GRAVITY = 0.2;
+const SLOW_MO_MODIFIER = 0.075;
 
 // launch arrow consts
 const LAUNCH_ARROW_SPEED = 0.75;
 const LAUNCH_ARROW_MIN_ANGLE = 0;
 const LAUNCH_ARROW_MAX_ANGLE = 90;
+const LAUNCH_ARROW_STRENGHT_SPEED = 0.01;
 const LAUNCH_ARROW_MAX_STRENGTH = 2;
+const LAUNCH_ARROW_STRENGTH_MODIFIER = 10;
 
 // throw arrow consts
-const THROW_ARROW_SPEED = 2.5;
+const THROW_ARROW_SPEED = 2;
+
+// blade
+const BLADE_SPEED = 500;
+const BLADE_START_DISTANCE = 50;
 
 // game state
 let launchState = "prelaunch";
-let frozen = false;
+let slomo = false;
 let gravity = 0;
+
+const speedModifier = () => slomo ? SLOW_MO_MODIFIER : 1;
 
 // initialize context
 kaboom({ width: 36*UNITS, height: 20*UNITS });
@@ -59,6 +68,7 @@ add([
   pos(0, height() - 4*UNITS),
   area(),
   solid(),
+  outline(),
   color(127, 200, 255),
 ]);
 
@@ -69,6 +79,7 @@ add([
   pos(8*UNITS, height() - 3*UNITS),
   area(),
   solid(),
+  outline(),
   color(127, 255, 255),
 ]);
 
@@ -81,42 +92,97 @@ const throwArrow = add([
   pos(-2*UNITS, -2*UNITS),
   origin("center"),
   area(),
+  opacity(0),
+]);
+
+add([
+  "enemy",
+  rect(1*UNITS, 2*UNITS),
+  pos(10*UNITS, height() - 5*UNITS),
+  area(),
+  body(),
+  color(60, 230, 110),
+  outline(),
+]);
+
+add([
+  "enemy",
+  rect(1*UNITS, 2*UNITS),
+  pos(18*UNITS, height() - 5*UNITS),
+  area(),
+  body(),
+  color(60, 230, 110),
+  outline(),
+]);
+
+add([
+  "enemy",
+  rect(1*UNITS, 2*UNITS),
+  pos(24*UNITS, height() - 5*UNITS),
+  area(),
+  body(),
+  color(60, 230, 110),
+  outline(),
 ]);
 
 /**
  * Event Handling
  */
 
-// begin launch
-mouseDown(() => {
-  if (launchState === "prelaunch") {
-      launchState = "launching";
-  }
-});
 
-// launch
-mouseRelease(() => {
+// throwing
+const startThrow = () => {
+  slomo = true;
+  throwArrow.opacity = 1;
+  throwArrow.pos = player.pos.add(0.5*UNITS, 0.5*UNITS);
+};
+const throwBlade = () => {
+  const bladePos = throwArrow.pos.add(dir(throwArrow.angle - 90).scale(BLADE_START_DISTANCE));
+  add([
+    "blade",
+    rect(10, 10),
+    area(),
+    pos(bladePos),
+    {
+      speed: BLADE_SPEED,
+      throwAngle: throwArrow.angle - 90,
+    }
+  ]);
+};
+
+const gameAction = () => {
+  if (launchState === "launched" && !slomo) {
+    startThrow();
+  } else if (slomo) {
+    throwBlade();
+  }
+}
+
+const actionDown = () => {
+ if (launchState === "prelaunch") {
+    launchState = "launching";
+  }
+}
+
+const actionUp = () => {
   if (launchState === "launching") {
     launchState = "launched"
     const start = vec2(0,0);
-    const end = start.add((dir(LAUNCH_ARROW_MAX_ANGLE - launchArrow.angle).scale(launchArrow.scale.scale(10))));
+    const end = start.add((dir(LAUNCH_ARROW_MAX_ANGLE - launchArrow.angle).scale(launchArrow.scale.scale(LAUNCH_ARROW_STRENGTH_MODIFIER))));
 
     player.sideSpeed = end.x;
     player.upSpeed = end.y;
     gravity = GRAVITY;
   }
-});
+}
 
-// throwing
-const startThrow = () => {
-  frozen = true;
-  throwArrow.pos = player.pos.add(0.5*UNITS, 0.5*UNITS);
-};
-mouseClick(() => {
-  if (launchState === "launched") {
-    startThrow();
-  }
-})
+mouseDown(actionDown);
+mouseRelease(actionUp);
+mouseClick(gameAction)
+
+keyDown("space", actionDown);
+keyRelease("space", actionUp);
+keyPress("space", gameAction);
 
 // landing
 collides("player", "land", () => {
@@ -125,7 +191,20 @@ collides("player", "land", () => {
   player.upSpeed = 0;
   gravity = 0;
   shake(); // why not?
-})
+});
+
+collides("blade", "enemy", (blade) => {
+  blade.speed = 0;
+  shake();
+});
+
+collides("blade", "land", (blade) => {
+  blade.speed = 0;
+});
+
+action("blade", (blade) => {
+  blade.move(dir(blade.throwAngle).scale(blade.speed * speedModifier()));
+});
 
 /** 
  * Game Loops
@@ -133,8 +212,8 @@ collides("player", "land", () => {
 
 // player movement
 player.action(() => {
-  if (!frozen) {
-    player.moveBy(player.sideSpeed, -player.upSpeed);
+  player.moveBy(player.sideSpeed * speedModifier(), -player.upSpeed * speedModifier());
+  if (!slomo) {
     player.upSpeed -= gravity;  
   }
 });
@@ -151,7 +230,7 @@ launchArrow.action(() => {
     launchArrow.angle = launchArrow.angle + (direction * LAUNCH_ARROW_SPEED);
   } else if (launchState === "launching") {
     if (launchArrow.scale.x <= LAUNCH_ARROW_MAX_STRENGTH) {
-          launchArrow.scale = launchArrow.scale.add(0.01, 0.01);
+          launchArrow.scale = launchArrow.scale.add(LAUNCH_ARROW_STRENGHT_SPEED, LAUNCH_ARROW_STRENGHT_SPEED);
     }
   } else if (launchState === "launched") {
     launchArrow.destroy();
@@ -160,11 +239,13 @@ launchArrow.action(() => {
 
 // throw arrow movement
 throwArrow.action(() => {
-  if (frozen) {
+  if (slomo) {
     throwArrow.angle += THROW_ARROW_SPEED;
     if (throwArrow.angle === 360) {
-      frozen = false;
+      slomo = false;
       throwArrow.destroy();
     }
   }
+
+  throwArrow.pos = player.pos.add(0.5*UNITS, 0.5*UNITS);
 });

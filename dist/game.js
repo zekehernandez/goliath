@@ -2352,14 +2352,20 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
   // code/main.js
   var UNITS = 48;
   var GRAVITY = 0.2;
+  var SLOW_MO_MODIFIER = 0.075;
   var LAUNCH_ARROW_SPEED = 0.75;
   var LAUNCH_ARROW_MIN_ANGLE = 0;
   var LAUNCH_ARROW_MAX_ANGLE = 90;
+  var LAUNCH_ARROW_STRENGHT_SPEED = 0.01;
   var LAUNCH_ARROW_MAX_STRENGTH = 2;
-  var THROW_ARROW_SPEED = 2.5;
+  var LAUNCH_ARROW_STRENGTH_MODIFIER = 10;
+  var THROW_ARROW_SPEED = 2;
+  var BLADE_SPEED = 500;
+  var BLADE_START_DISTANCE = 50;
   var launchState = "prelaunch";
-  var frozen = false;
+  var slomo = false;
   var gravity = 0;
+  var speedModifier = /* @__PURE__ */ __name(() => slomo ? SLOW_MO_MODIFIER : 1, "speedModifier");
   kaboom_default({ width: 36 * UNITS, height: 20 * UNITS });
   loadSprite("bean", "sprites/bean.png");
   loadSprite("arrow", "sprites/arrow.png");
@@ -2388,6 +2394,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     pos(0, height() - 4 * UNITS),
     area(),
     solid(),
+    outline(),
     color(127, 200, 255)
   ]);
   add([
@@ -2396,6 +2403,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     pos(8 * UNITS, height() - 3 * UNITS),
     area(),
     solid(),
+    outline(),
     color(127, 255, 255)
   ]);
   var throwArrow = add([
@@ -2405,32 +2413,82 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     rotate(0),
     pos(-2 * UNITS, -2 * UNITS),
     origin("center"),
-    area()
+    area(),
+    opacity(0)
   ]);
-  mouseDown(() => {
+  add([
+    "enemy",
+    rect(1 * UNITS, 2 * UNITS),
+    pos(10 * UNITS, height() - 5 * UNITS),
+    area(),
+    body(),
+    color(60, 230, 110),
+    outline()
+  ]);
+  add([
+    "enemy",
+    rect(1 * UNITS, 2 * UNITS),
+    pos(18 * UNITS, height() - 5 * UNITS),
+    area(),
+    body(),
+    color(60, 230, 110),
+    outline()
+  ]);
+  add([
+    "enemy",
+    rect(1 * UNITS, 2 * UNITS),
+    pos(24 * UNITS, height() - 5 * UNITS),
+    area(),
+    body(),
+    color(60, 230, 110),
+    outline()
+  ]);
+  var startThrow = /* @__PURE__ */ __name(() => {
+    slomo = true;
+    throwArrow.opacity = 1;
+    throwArrow.pos = player.pos.add(0.5 * UNITS, 0.5 * UNITS);
+  }, "startThrow");
+  var throwBlade = /* @__PURE__ */ __name(() => {
+    const bladePos = throwArrow.pos.add(dir(throwArrow.angle - 90).scale(BLADE_START_DISTANCE));
+    add([
+      "blade",
+      rect(10, 10),
+      area(),
+      pos(bladePos),
+      {
+        speed: BLADE_SPEED,
+        throwAngle: throwArrow.angle - 90
+      }
+    ]);
+  }, "throwBlade");
+  var gameAction = /* @__PURE__ */ __name(() => {
+    if (launchState === "launched" && !slomo) {
+      startThrow();
+    } else if (slomo) {
+      throwBlade();
+    }
+  }, "gameAction");
+  var actionDown = /* @__PURE__ */ __name(() => {
     if (launchState === "prelaunch") {
       launchState = "launching";
     }
-  });
-  mouseRelease(() => {
+  }, "actionDown");
+  var actionUp = /* @__PURE__ */ __name(() => {
     if (launchState === "launching") {
       launchState = "launched";
       const start = vec2(0, 0);
-      const end = start.add(dir(LAUNCH_ARROW_MAX_ANGLE - launchArrow.angle).scale(launchArrow.scale.scale(10)));
+      const end = start.add(dir(LAUNCH_ARROW_MAX_ANGLE - launchArrow.angle).scale(launchArrow.scale.scale(LAUNCH_ARROW_STRENGTH_MODIFIER)));
       player.sideSpeed = end.x;
       player.upSpeed = end.y;
       gravity = GRAVITY;
     }
-  });
-  var startThrow = /* @__PURE__ */ __name(() => {
-    frozen = true;
-    throwArrow.pos = player.pos.add(0.5 * UNITS, 0.5 * UNITS);
-  }, "startThrow");
-  mouseClick(() => {
-    if (launchState === "launched") {
-      startThrow();
-    }
-  });
+  }, "actionUp");
+  mouseDown(actionDown);
+  mouseRelease(actionUp);
+  mouseClick(gameAction);
+  keyDown("space", actionDown);
+  keyRelease("space", actionUp);
+  keyPress("space", gameAction);
   collides("player", "land", () => {
     launchState = "landed";
     player.sideSpeed = 0;
@@ -2438,9 +2496,19 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     gravity = 0;
     shake();
   });
+  collides("blade", "enemy", (blade) => {
+    blade.speed = 0;
+    shake();
+  });
+  collides("blade", "land", (blade) => {
+    blade.speed = 0;
+  });
+  action("blade", (blade) => {
+    blade.move(dir(blade.throwAngle).scale(blade.speed * speedModifier()));
+  });
   player.action(() => {
-    if (!frozen) {
-      player.moveBy(player.sideSpeed, -player.upSpeed);
+    player.moveBy(player.sideSpeed * speedModifier(), -player.upSpeed * speedModifier());
+    if (!slomo) {
       player.upSpeed -= gravity;
     }
   });
@@ -2455,20 +2523,21 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       launchArrow.angle = launchArrow.angle + direction * LAUNCH_ARROW_SPEED;
     } else if (launchState === "launching") {
       if (launchArrow.scale.x <= LAUNCH_ARROW_MAX_STRENGTH) {
-        launchArrow.scale = launchArrow.scale.add(0.01, 0.01);
+        launchArrow.scale = launchArrow.scale.add(LAUNCH_ARROW_STRENGHT_SPEED, LAUNCH_ARROW_STRENGHT_SPEED);
       }
     } else if (launchState === "launched") {
       launchArrow.destroy();
     }
   });
   throwArrow.action(() => {
-    if (frozen) {
+    if (slomo) {
       throwArrow.angle += THROW_ARROW_SPEED;
       if (throwArrow.angle === 360) {
-        frozen = false;
+        slomo = false;
         throwArrow.destroy();
       }
     }
+    throwArrow.pos = player.pos.add(0.5 * UNITS, 0.5 * UNITS);
   });
 })();
 //# sourceMappingURL=game.js.map
