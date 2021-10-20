@@ -1,9 +1,10 @@
 import k from "../kaboom";
 import { UNITS } from '../constants';
+import { START_JUMP_END_FRAME, LANDING_END_FRAME } from '../main';
 
 // general game consts
 const GRAVITY = 0.2;
-const SLOW_MO_MODIFIER = 0.075;
+const SLOW_MO_MODIFIER = 0.045;
 
 // launch arrow consts
 const LAUNCH_ARROW_SPEED = 0.75;
@@ -17,7 +18,7 @@ const LAUNCH_ARROW_STRENGTH_MODIFIER = 10;
 const THROW_ARROW_SPEED = 2;
 
 // blade
-const BLADE_SPEED = 500;
+const BLADE_SPEED = 1000;
 const BLADE_START_DISTANCE = 50;
 
 k.scene("game", (args = {}) => {
@@ -59,9 +60,12 @@ k.scene("game", (args = {}) => {
   // player character
   const player = add([
     "player",
-    sprite("bean"),
-    pos(2*UNITS, height() - 5*UNITS),
+    sprite("player"),
+    pos(3*UNITS, height() - 5*UNITS),
+    scale(2, 2),
+    z(1),
     area(),
+    origin("center"),
     {
       sideSpeed: 0,
       upSpeed: 0,
@@ -74,7 +78,7 @@ k.scene("game", (args = {}) => {
     sprite("arrow"),
     scale(0.5, 0.5),
     rotate(0),
-    pos(2.5*UNITS, height() - 4*UNITS),
+    pos(3*UNITS, height() - 5*UNITS),
     origin("center"),
     area(),
   ]);
@@ -152,7 +156,6 @@ k.scene("game", (args = {}) => {
   const startThrow = () => {
     slowMo = true;
     throwArrow.opacity = 1;
-    throwArrow.pos = player.pos.add(0.5*UNITS, 0.5*UNITS);
   };
   const throwBlade = () => {
     const bladePos = throwArrow.pos.add(dir(throwArrow.angle - 90).scale(BLADE_START_DISTANCE));
@@ -224,6 +227,8 @@ k.scene("game", (args = {}) => {
     player.sideSpeed = 0;
     player.upSpeed = 0;
     gravity = 0;
+    slowMo = false;
+    throwArrow.destroy();
     shake(20); // why not?
   });
 
@@ -249,6 +254,39 @@ k.scene("game", (args = {}) => {
     player.moveBy(player.sideSpeed * speedModifier(), -player.upSpeed * speedModifier());
     if (!slowMo) {
       player.upSpeed -= gravity;  
+    }
+
+    // I have to manage the animation transitions like this because onEnd()
+    const curAnim = player.curAnim();
+    if (launchState === "prelaunch" && curAnim !== "idle") {
+      player.play("idle", { loop: true, speed: 4 });
+    } else if (launchState === "launching" && curAnim !== "crouch") {
+      player.play("crouch", { loop: true, speed: 4 });
+    } else if (launchState === "launched") {
+      if (slowMo) {
+        if (curAnim === "somersault") {
+          player.play("throwing");
+        }
+
+
+        player.angle = throwArrow.angle;
+      } else {
+        if (curAnim === "crouch") {
+          player.play("startJump", { speed: 10 });
+        } else if (curAnim !== "somersault" && (curAnim !== "startJump" || player.frame >= START_JUMP_END_FRAME)) {
+          player.play("somersault", { loop: true });
+          player.angle = 0;
+          player.flipX(false);
+        } 
+      }
+    } else if (launchState === "landed") {
+      if (!curAnim || curAnim === "somersault" || curAnim === "throwing") {
+        player.play("landing", { speed: 10 });
+        player.angle = 0;
+        player.flipX(false);
+      } else if (curAnim === "landing" && player.frame >= LANDING_END_FRAME) {
+        player.play("idle", { speed: 4, loop: true });
+      } 
     }
   });
 
@@ -281,6 +319,6 @@ k.scene("game", (args = {}) => {
       }
     }
 
-    throwArrow.pos = player.pos.add(0.5*UNITS, 0.5*UNITS);
+    throwArrow.pos = player.pos.add(0*UNITS, 0*UNITS);
   });
 });
