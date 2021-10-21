@@ -13,9 +13,9 @@ k.loadSpriteAtlas("sprites/player_atlas.png", {
     x: 0,
     y: 0,
     width: 720,
-    height: 240,
+    height: 336,
     sliceX: 15,
-    sliceY: 5,
+    sliceY: 7,
     anims: {
       idle: { from: 15, to: 21 },
       crouch: { from: 30, to: 35 },
@@ -23,8 +23,10 @@ k.loadSpriteAtlas("sprites/player_atlas.png", {
       somersault: { from: 50, to: 55   },
       landing: { from: 58, to: LANDING_END_FRAME },
       throwing: { from: 60, to: 60 },
+      falling: { from: 75, to: 77 },
+      kicking: { from: 90, to: 90 },
     },
   },
 });
 
-k.go("title");
+k.go("game");

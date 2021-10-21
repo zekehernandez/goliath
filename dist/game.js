@@ -2381,7 +2381,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       "                                ",
       "                                ",
       "                                ",
-      "                                ",
+      "            o                   ",
       "                                ",
       "                                ",
       "                                ",
@@ -2458,8 +2458,16 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
   ];
 
   // code/scenes/game.js
+  var COLORS = {
+    BLACK: rgb(0, 0, 0),
+    GREY: rgb(180, 180, 160),
+    RED: rgb(240, 50, 50),
+    GREEN: rgb(60, 230, 110)
+  };
   var GRAVITY = 0.2;
   var SLOW_MO_MODIFIER = 0.045;
+  var STARTING_AMMO_COUNT = 3;
+  var STARTING_SMOKE_BOMB_COUNT = 3;
   var LAUNCH_ARROW_SPEED = 0.75;
   var LAUNCH_ARROW_MIN_ANGLE = 0;
   var LAUNCH_ARROW_MAX_ANGLE = 90;
@@ -2469,19 +2477,23 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
   var THROW_ARROW_SPEED = 2;
   var BLADE_SPEED = 1e3;
   var BLADE_START_DISTANCE = 50;
-  var playerProps = [
+  var moverProps = {
+    sideSpeed: 0,
+    upSpeed: 0
+  };
+  var kickableProps = {
+    kickDirection: 0
+  };
+  var playerComps = [
     "player",
     sprite("player"),
     scale(2, 2),
     z(1),
     area(),
     origin("center"),
-    {
-      sideSpeed: 0,
-      upSpeed: 0
-    }
+    __spreadValues({}, moverProps)
   ];
-  var launchArrowProps = [
+  var launchArrowComps = [
     "launchArrow",
     sprite("arrow"),
     scale(0.5, 0.5),
@@ -2489,7 +2501,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     origin("center"),
     area()
   ];
-  var throwArrowProps = [
+  var throwArrowComps = [
     "throwArrow",
     sprite("arrow"),
     scale(0.5, 0.5),
@@ -2501,34 +2513,66 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
   ];
   kaboom_default2.scene("game", (args = {}) => {
     let currentLevel;
+    let ammoCount = STARTING_AMMO_COUNT;
+    let smokeBombCount = STARTING_SMOKE_BOMB_COUNT;
     let launchState;
     let slowMo;
-    let gravity;
     let previousMouseDown;
     let levelWin;
+    let isKicking;
     let player;
     let launchArrow;
     let throwArrow;
     let overlay;
+    let ammoCounter;
+    let smokeBombCounter;
+    let ammoRecovered = 0;
+    let misses;
     let startingPosition;
     const speedModifier = /* @__PURE__ */ __name(() => slowMo ? SLOW_MO_MODIFIER : 1, "speedModifier");
+    const getAmmoCounterText = /* @__PURE__ */ __name(() => `Ammo: ${ammoCount}`, "getAmmoCounterText");
+    const getSmokeBombCounterText = /* @__PURE__ */ __name(() => `Smoke Bombs: ${smokeBombCount}`, "getSmokeBombCounterText");
+    layers([
+      "bg",
+      "game",
+      "ui"
+    ], "game");
     const startLevel = /* @__PURE__ */ __name((newLevel) => {
       kaboom_default2.every((obj) => obj.destroy());
+      ammoCount += ammoRecovered;
+      ammoCounter = add([
+        "ammoCounter",
+        text(getAmmoCounterText(), { font: "sink", size: 24 }),
+        pos(1 * UNITS, 1 * UNITS),
+        layer("ui"),
+        color(ammoCount > 0 ? COLORS.BLACK : COLORS.RED)
+      ]);
+      smokeBombCounter = add([
+        "smokeBombsCounter",
+        text(getSmokeBombCounterText(), { font: "sink", size: 24 }),
+        pos(1 * UNITS, 2 * UNITS),
+        layer("ui"),
+        color(smokeBombCount > 0 ? COLORS.BLACK : COLORS.RED)
+      ]);
       currentLevel = newLevel;
       levelWin = false;
       launchState = "prelaunch";
       slowMo = false;
-      gravity = 0;
+      isKicking = false;
       previousMouseDown = mouseIsDown();
+      ammoRecovered = 0;
+      misses = 0;
       add([
         "sky",
         rect(width(), height()),
-        color(220, 240, 255)
+        color(220, 240, 255),
+        layer("bg")
       ]);
       overlay = add([
         rect(width(), height()),
         color(0, 0, 0),
-        opacity(0)
+        opacity(0),
+        layer("bg")
       ]);
       overlay.action(() => {
         if (slowMo) {
@@ -2541,7 +2585,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       addLevel(levels_default[currentLevel], {
         width: 48,
         height: 48,
-        "@": () => [...playerProps],
+        "@": () => [...playerComps],
         "+": () => [
           "launch",
           rect(1 * UNITS, 1 * UNITS),
@@ -2560,35 +2604,74 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         ],
         "x": () => [
           "enemy",
+          "kickable",
           rect(1 * UNITS, 2 * UNITS),
           area(),
           body(),
-          color(60, 230, 110),
+          color(COLORS.GREEN),
           origin("left"),
           outline(),
-          {
+          __spreadValues({
             disabled: false
-          }
+          }, kickableProps)
+        ],
+        "o": () => [
+          "enemy",
+          "flier",
+          rect(1 * UNITS, 1 * UNITS),
+          area(),
+          solid(),
+          color(COLORS.GREEN),
+          origin("left"),
+          outline(),
+          __spreadValues({
+            disabled: false
+          }, moverProps)
         ]
       });
       player = get("player")[0];
       player.play("landing");
       startingPosition = __spreadValues({}, player.pos);
-      launchArrow = add([...launchArrowProps, pos(player.pos)]);
-      throwArrow = add([...throwArrowProps]);
+      launchArrow = add([...launchArrowComps, pos(player.pos)]);
+      throwArrow = add([...throwArrowComps, follow(player)]);
     }, "startLevel");
     startLevel(0);
     const reset = /* @__PURE__ */ __name(() => {
+      useSmokeBomb();
       player.destroy();
       throwArrow.destroy();
+      launchArrow.destroy();
       launchState = "prelaunch";
       slowMo = false;
-      gravity = 0;
-      player = add([...playerProps, pos(startingPosition)]);
+      player = add([...playerComps, pos(startingPosition)]);
       player.play("landing");
-      launchArrow = add([...launchArrowProps, pos(startingPosition)]);
-      throwArrow = add([...throwArrowProps]);
+      launchArrow = add([...launchArrowComps, pos(startingPosition)]);
+      throwArrow = add([...throwArrowComps, follow(player)]);
     }, "reset");
+    const attemptReset = /* @__PURE__ */ __name(() => {
+      if (smokeBombCount > 0) {
+        reset();
+      } else {
+        go("gameOver");
+      }
+    }, "attemptReset");
+    const flashAmmo = /* @__PURE__ */ __name(() => {
+      shake(1);
+    }, "flashAmmo");
+    const useAmmo = /* @__PURE__ */ __name(() => {
+      ammoCount -= 1;
+      ammoCounter.text = getAmmoCounterText();
+      if (ammoCount === 0) {
+        ammoCounter.color = COLORS.RED;
+      }
+    }, "useAmmo");
+    const useSmokeBomb = /* @__PURE__ */ __name(() => {
+      smokeBombCount -= 1;
+      smokeBombCounter.text = getSmokeBombCounterText();
+      if (smokeBombCount === 0) {
+        smokeBombCounter.color = COLORS.RED;
+      }
+    }, "useSmokeBomb");
     const startThrow = /* @__PURE__ */ __name(() => {
       slowMo = true;
       throwArrow.opacity = 1;
@@ -2600,17 +2683,18 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         rect(10, 10),
         area(),
         pos(bladePos),
-        {
+        __spreadValues({
           speed: BLADE_SPEED,
           throwAngle: throwArrow.angle - 90
-        }
+        }, moverProps)
       ]);
+      useAmmo();
     }, "throwBlade");
     const gameAction = /* @__PURE__ */ __name(() => {
       if (launchState === "launched" && !slowMo) {
-        startThrow();
+        ammoCount > 0 ? startThrow() : flashAmmo();
       } else if (slowMo) {
-        throwBlade();
+        ammoCount > 0 ? throwBlade() : flashAmmo();
       } else if (levelWin) {
         if (currentLevel + 1 === levels_default.length) {
           go("win");
@@ -2629,6 +2713,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         launchState = "launched";
         const start = vec2(0, 0);
         const end = start.add(dir(LAUNCH_ARROW_MAX_ANGLE - launchArrow.angle).scale(launchArrow.scale.scale(LAUNCH_ARROW_STRENGTH_MODIFIER)));
+        player.use("mover");
         player.sideSpeed = end.x;
         player.upSpeed = end.y;
         gravity = GRAVITY;
@@ -2653,15 +2738,6 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     keyRelease("space", actionUp);
     keyPress("space", gameAction);
     keyPress("tab", () => startLevel(currentLevel));
-    collides("player", "land", (player2, land) => {
-      launchState = "landed";
-      player2.sideSpeed = 0;
-      player2.upSpeed = 0;
-      gravity = 0;
-      slowMo = false;
-      throwArrow.destroy();
-      checkEnd();
-    });
     const winLevel = /* @__PURE__ */ __name(() => {
       wait(1, () => {
         destroyAll("blade");
@@ -2672,36 +2748,64 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         shake(20);
       });
       wait(2, () => {
-        levelWin = true;
-        add([
+        const stats = add([
           rect(10 * UNITS, 6 * UNITS),
           area(),
           color(40, 40, 60),
-          pos(center()),
-          origin("center")
+          pos(center().x, 2 * UNITS),
+          origin("top"),
+          layer("ui")
         ]);
         add([
           "title",
           text("Great!", { size: 40 }),
           origin("center"),
-          pos(center().x, center().y - 20)
+          pos(stats.pos.x, stats.pos.y + 1 * UNITS),
+          layer("ui")
         ]);
-        add([
-          "continue",
-          text("Click to continue", { size: 20 }),
-          origin("center"),
-          pos(center().x, center().y + 20)
-        ]);
+        wait(1, () => {
+          add([
+            "misses",
+            text(`Misses: ${misses}`, { size: 14 }),
+            origin("center"),
+            pos(stats.pos.x, stats.pos.y + 2 * UNITS),
+            layer("ui")
+          ]);
+          shake(10);
+          wait(1, () => {
+            add([
+              "ammorecovered",
+              text(`Ammo Recovered: ${ammoRecovered}`, { size: 14 }),
+              origin("center"),
+              pos(stats.pos.x, stats.pos.y + 3 * UNITS),
+              layer("ui")
+            ]);
+            shake(10);
+            wait(1, () => {
+              add([
+                "continue",
+                text("Click to continue", { size: 20 }),
+                origin("center"),
+                pos(stats.pos.x, stats.pos.y + 5 * UNITS),
+                layer("ui")
+              ]);
+              shake(20);
+              levelWin = true;
+            });
+          });
+        });
       });
     }, "winLevel");
     const incompleteLevel = /* @__PURE__ */ __name(() => {
       wait(1, () => {
         every("enemy", (enemy) => {
           if (!enemy.disabled) {
-            enemy.color = rgb(240, 50, 50);
+            enemy.color = COLORS.RED;
           }
         });
-        reset();
+      });
+      wait(2, () => {
+        attemptReset();
       });
     }, "incompleteLevel");
     const checkEnd = /* @__PURE__ */ __name(() => {
@@ -2718,6 +2822,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
             isVictory = false;
           }
         });
+        console.log("hello what is happening");
         if (isVictory) {
           winLevel();
         } else {
@@ -2725,22 +2830,74 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         }
       }
     }, "checkEnd");
+    collides("mover", "land", (mover) => {
+      mover.unuse("mover");
+      mover.sideSpeed = 0;
+      mover.upSpeed = 0;
+      shake(10);
+    });
+    collides("player", "land", (player2, land) => {
+      if (launchState !== "landed") {
+        launchState = "landed";
+        slowMo = false;
+        throwArrow.destroy();
+        checkEnd();
+      }
+    });
     collides("blade", "enemy", (blade, enemy) => {
+      const wasPreviouslyDisabled = enemy.disabled;
       blade.speed = 0;
       enemy.disabled = true;
-      enemy.color = rgb(180, 180, 160);
-      shake(10);
-      checkEnd();
+      enemy.color = COLORS.GREY;
+      ammoRecovered++;
+      shake(5);
+      !wasPreviouslyDisabled && checkEnd();
+    });
+    collides("blade", "flier", (blade, flier) => {
+      flier.use("mover");
+      blade.use(follow(flier, blade.pos.sub(flier.pos)));
+      const direction2 = dir(blade.throwAngle).scale(4);
+      console.log({ angle: blade.throwAngle, direction: direction2 });
+      flier.sideSpeed = direction2.x;
+      flier.upSpeed = -direction2.y;
     });
     collides("blade", "land", (blade) => {
       blade.speed = 0;
+      ammoRecovered++;
+      misses++;
       checkEnd();
+    });
+    collides("player", "flier", (player2, flier) => {
+      if (!flier.disabled) {
+        shake(10);
+        player2.sideSpeed = 0;
+      }
+    });
+    collides("player", "kickable", (player2, kickable) => {
+      if (kickable.disabled === false) {
+        isKicking = true;
+        slowMo = true;
+        kickable.disabled = true;
+        kickable.color = COLORS.GREY;
+        shake(10);
+        wait(1, () => {
+          kickable.kickDirection = player2.pos.sub(kickable.pos).x;
+          slowMo = false;
+          isKicking = false;
+        });
+      }
     });
     action("blade", (blade) => {
       blade.move(dir(blade.throwAngle).scale(blade.speed * speedModifier()));
       if (blade.pos.y >= height() || blade.pos.x >= width() || blade.pos.y < 0 || blade.pos.x < 0) {
+        misses++;
         destroy(blade);
         checkEnd();
+      }
+    });
+    action("kickable", (kickable) => {
+      if (kickable.kickDirection !== 0) {
+        kickable.moveBy(kickable.kickDirection < 0 ? 40 : -40, 0);
       }
     });
     let direction = 1;
@@ -2769,25 +2926,28 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
           throwArrow2.destroy();
         }
       }
-      throwArrow2.pos = player.pos.add(0 * UNITS, 0 * UNITS);
+    });
+    action("mover", (mover) => {
+      mover.moveBy(mover.sideSpeed * speedModifier(), -mover.upSpeed * speedModifier());
+      if (!slowMo) {
+        mover.upSpeed -= gravity;
+      }
     });
     action("player", (player2) => {
-      player2.moveBy(player2.sideSpeed * speedModifier(), -player2.upSpeed * speedModifier());
-      if (!slowMo) {
-        player2.upSpeed -= gravity;
-      }
       if (player2.pos.x > width() + 2 * UNITS || player2.pos.y > height() + 2 * UNITS) {
-        reset();
+        attemptReset();
       }
       const curAnim = player2.curAnim();
-      if (launchState === "prelaunch" && curAnim !== "idle") {
+      if (isKicking) {
+        player2.play("kicking", { loop: true });
+      } else if (launchState === "prelaunch" && curAnim !== "idle") {
         player2.play("idle", { loop: true, speed: 4 });
       } else if (launchState === "launching" && curAnim !== "crouch") {
         player2.play("crouch", { loop: true, speed: 4 });
       } else if (launchState === "launched" || launchState === "afterThrow") {
         if (slowMo) {
           if (curAnim === "somersault") {
-            player2.play("throwing");
+            player2.play("throwing", { loop: true });
           }
           player2.angle = throwArrow.angle;
         } else {
@@ -2800,7 +2960,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
           }
         }
       } else if (launchState === "landed" && player2.frame !== LANDING_END_FRAME) {
-        if (!curAnim || curAnim === "somersault" || curAnim === "throwing") {
+        if (!curAnim || curAnim === "somersault" || curAnim === "throwing" || curAnim === "kicking") {
           player2.play("landing", { speed: 2 });
           player2.flipX(false);
           player2.angle = 0;
@@ -2871,6 +3031,36 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     mouseClick(() => kaboom_default2.go("game"));
   });
 
+  // code/scenes/gameOver.js
+  kaboom_default2.scene("gameOver", (args = {}) => {
+    add([
+      "background",
+      rect(width(), height()),
+      color(20, 20, 40)
+    ]);
+    add([
+      "title",
+      text("GAME OVER", { size: 60 }),
+      origin("center"),
+      pos(center().x, center().y - 100)
+    ]);
+    const cta = add([
+      "cta",
+      text("Click to try again", { size: 30 }),
+      origin("center"),
+      pos(center().x, center().y + 50),
+      opacity(0)
+    ]);
+    loop(0.75, () => {
+      if (cta.opacity === 0) {
+        cta.opacity = 1;
+      } else {
+        cta.opacity = 0;
+      }
+    });
+    mouseClick(() => kaboom_default2.go("game"));
+  });
+
   // code/main.js
   var START_JUMP_END_FRAME = 49;
   var LANDING_END_FRAME = 59;
@@ -2881,19 +3071,21 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       x: 0,
       y: 0,
       width: 720,
-      height: 240,
+      height: 336,
       sliceX: 15,
-      sliceY: 5,
+      sliceY: 7,
       anims: {
         idle: { from: 15, to: 21 },
         crouch: { from: 30, to: 35 },
         startJump: { from: 47, to: START_JUMP_END_FRAME },
         somersault: { from: 50, to: 55 },
         landing: { from: 58, to: LANDING_END_FRAME },
-        throwing: { from: 60, to: 60 }
+        throwing: { from: 60, to: 60 },
+        falling: { from: 75, to: 77 },
+        kicking: { from: 90, to: 90 }
       }
     }
   });
-  kaboom_default2.go("title");
+  kaboom_default2.go("game");
 })();
 //# sourceMappingURL=game.js.map
