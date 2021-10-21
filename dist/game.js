@@ -1,5 +1,20 @@
 (() => {
   var __defProp = Object.defineProperty;
+  var __getOwnPropSymbols = Object.getOwnPropertySymbols;
+  var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __propIsEnum = Object.prototype.propertyIsEnumerable;
+  var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+  var __spreadValues = (a, b) => {
+    for (var prop in b || (b = {}))
+      if (__hasOwnProp.call(b, prop))
+        __defNormalProp(a, prop, b[prop]);
+    if (__getOwnPropSymbols)
+      for (var prop of __getOwnPropSymbols(b)) {
+        if (__propIsEnum.call(b, prop))
+          __defNormalProp(a, prop, b[prop]);
+      }
+    return a;
+  };
   var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
   // node_modules/kaboom/dist/kaboom.mjs
@@ -2353,8 +2368,94 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
   var UNITS = 48;
 
   // code/kaboom.js
-  var k = kaboom_default({ width: 36 * UNITS, height: 20 * UNITS, font: "sink" });
+  var k = kaboom_default({ width: 32 * UNITS, height: 18 * UNITS, font: "sink" });
   var kaboom_default2 = k;
+
+  // code/levels.js
+  var levels_default = [
+    [
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      " @                              ",
+      "++                     x        ",
+      "++   ========================== ",
+      "++   ========================== ",
+      "++   ========================== "
+    ],
+    [
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      " @                              ",
+      "++                              ",
+      "++                              ",
+      "++                              ",
+      "++                      x       ",
+      "++              ==========      ",
+      "++              ==========      ",
+      "++      ==================      ",
+      "++      ==================      ",
+      "++      ==================      ",
+      "++      ==================      "
+    ],
+    [
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "               x                ",
+      "              ============      ",
+      "              ============      ",
+      " @            ============      ",
+      "++            ============      "
+    ],
+    [
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      " @                              ",
+      "++                              ",
+      "++                              ",
+      "++                              ",
+      "++           x         x        ",
+      "++   =======================.   ",
+      "++   =======================.   ",
+      "++   =======================.   ",
+      "++   =======================.   ",
+      "++   =======================.   "
+    ]
+  ];
 
   // code/scenes/game.js
   var GRAVITY = 0.2;
@@ -2368,107 +2469,126 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
   var THROW_ARROW_SPEED = 2;
   var BLADE_SPEED = 1e3;
   var BLADE_START_DISTANCE = 50;
+  var playerProps = [
+    "player",
+    sprite("player"),
+    scale(2, 2),
+    z(1),
+    area(),
+    origin("center"),
+    {
+      sideSpeed: 0,
+      upSpeed: 0
+    }
+  ];
+  var launchArrowProps = [
+    "launchArrow",
+    sprite("arrow"),
+    scale(0.5, 0.5),
+    rotate(0),
+    origin("center"),
+    area()
+  ];
+  var throwArrowProps = [
+    "throwArrow",
+    sprite("arrow"),
+    scale(0.5, 0.5),
+    rotate(0),
+    pos(-2 * UNITS, -2 * UNITS),
+    origin("center"),
+    area(),
+    opacity(0)
+  ];
   kaboom_default2.scene("game", (args = {}) => {
-    let launchState = "prelaunch";
-    let slowMo = false;
-    let gravity = 0;
-    let previousMouseDown = mouseIsDown();
+    let currentLevel;
+    let launchState;
+    let slowMo;
+    let gravity;
+    let previousMouseDown;
+    let levelWin;
+    let player;
+    let launchArrow;
+    let throwArrow;
+    let overlay;
+    let startingPosition;
     const speedModifier = /* @__PURE__ */ __name(() => slowMo ? SLOW_MO_MODIFIER : 1, "speedModifier");
-    add([
-      "sky",
-      rect(width(), height()),
-      color(220, 240, 255)
-    ]);
-    const overlay = add([
-      rect(width(), height()),
-      color(0, 0, 0),
-      opacity(0)
-    ]);
-    overlay.action(() => {
-      if (slowMo) {
-        overlay.opacity = wave(0, 0.25, 1e3);
-      } else {
-        overlay.color = rgb(0, 0, 0);
-        overlay.opacity = 0;
-      }
-    });
-    const player = add([
-      "player",
-      sprite("player"),
-      pos(3 * UNITS, height() - 5 * UNITS),
-      scale(2, 2),
-      z(1),
-      area(),
-      origin("center"),
-      {
-        sideSpeed: 0,
-        upSpeed: 0
-      }
-    ]);
-    const launchArrow = add([
-      "launchArrow",
-      sprite("arrow"),
-      scale(0.5, 0.5),
-      rotate(0),
-      pos(3 * UNITS, height() - 5 * UNITS),
-      origin("center"),
-      area()
-    ]);
-    add([
-      "launch",
-      rect(4 * UNITS, 4 * UNITS),
-      pos(0, height() - 4 * UNITS),
-      area(),
-      solid(),
-      outline(),
-      color(127, 200, 255)
-    ]);
-    add([
-      "land",
-      rect(24 * UNITS, 3 * UNITS),
-      pos(8 * UNITS, height() - 3 * UNITS),
-      area(),
-      solid(),
-      outline(),
-      color(127, 255, 255)
-    ]);
-    const throwArrow = add([
-      "throwArrow",
-      sprite("arrow"),
-      scale(0.5, 0.5),
-      rotate(0),
-      pos(-2 * UNITS, -2 * UNITS),
-      origin("center"),
-      area(),
-      opacity(0)
-    ]);
-    add([
-      "enemy",
-      rect(1 * UNITS, 2 * UNITS),
-      pos(10 * UNITS, height() - 5 * UNITS),
-      area(),
-      body(),
-      color(60, 230, 110),
-      outline()
-    ]);
-    add([
-      "enemy",
-      rect(1 * UNITS, 2 * UNITS),
-      pos(18 * UNITS, height() - 5 * UNITS),
-      area(),
-      body(),
-      color(60, 230, 110),
-      outline()
-    ]);
-    add([
-      "enemy",
-      rect(1 * UNITS, 2 * UNITS),
-      pos(24 * UNITS, height() - 5 * UNITS),
-      area(),
-      body(),
-      color(60, 230, 110),
-      outline()
-    ]);
+    const startLevel = /* @__PURE__ */ __name((newLevel) => {
+      kaboom_default2.every((obj) => obj.destroy());
+      currentLevel = newLevel;
+      levelWin = false;
+      launchState = "prelaunch";
+      slowMo = false;
+      gravity = 0;
+      previousMouseDown = mouseIsDown();
+      add([
+        "sky",
+        rect(width(), height()),
+        color(220, 240, 255)
+      ]);
+      overlay = add([
+        rect(width(), height()),
+        color(0, 0, 0),
+        opacity(0)
+      ]);
+      overlay.action(() => {
+        if (slowMo) {
+          overlay.opacity = wave(0, 0.25, 1e3);
+        } else {
+          overlay.color = rgb(0, 0, 0);
+          overlay.opacity = 0;
+        }
+      });
+      addLevel(levels_default[currentLevel], {
+        width: 48,
+        height: 48,
+        "@": () => [...playerProps],
+        "+": () => [
+          "launch",
+          rect(1 * UNITS, 1 * UNITS),
+          area(),
+          solid(),
+          outline(),
+          color(127, 200, 255)
+        ],
+        "=": () => [
+          "land",
+          rect(1 * UNITS, 1 * UNITS),
+          area(),
+          solid(),
+          outline(),
+          color(127, 255, 255)
+        ],
+        "x": () => [
+          "enemy",
+          rect(1 * UNITS, 2 * UNITS),
+          area(),
+          body(),
+          color(60, 230, 110),
+          origin("left"),
+          outline(),
+          {
+            disabled: false
+          }
+        ]
+      });
+      player = get("player")[0];
+      player.play("landing");
+      startingPosition = __spreadValues({}, player.pos);
+      launchArrow = add([...launchArrowProps, pos(player.pos)]);
+      throwArrow = add([...throwArrowProps]);
+    }, "startLevel");
+    startLevel(0);
+    const reset = /* @__PURE__ */ __name(() => {
+      player.destroy();
+      throwArrow.destroy();
+      launchState = "prelaunch";
+      slowMo = false;
+      gravity = 0;
+      player = add([...playerProps, pos(startingPosition)]);
+      player.play("landing");
+      launchArrow = add([...launchArrowProps, pos(startingPosition)]);
+      throwArrow = add([...throwArrowProps]);
+    }, "reset");
     const startThrow = /* @__PURE__ */ __name(() => {
       slowMo = true;
       throwArrow.opacity = 1;
@@ -2491,6 +2611,12 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         startThrow();
       } else if (slowMo) {
         throwBlade();
+      } else if (levelWin) {
+        if (currentLevel + 1 === levels_default.length) {
+          go("win");
+        } else {
+          startLevel(currentLevel + 1);
+        }
       }
     }, "gameAction");
     const actionDown = /* @__PURE__ */ __name(() => {
@@ -2526,87 +2652,162 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     keyDown("space", actionDown);
     keyRelease("space", actionUp);
     keyPress("space", gameAction);
-    keyPress("tab", () => kaboom_default2.go("game"));
-    collides("player", "land", () => {
+    keyPress("tab", () => startLevel(currentLevel));
+    collides("player", "land", (player2, land) => {
       launchState = "landed";
-      player.sideSpeed = 0;
-      player.upSpeed = 0;
+      player2.sideSpeed = 0;
+      player2.upSpeed = 0;
       gravity = 0;
       slowMo = false;
       throwArrow.destroy();
-      shake(20);
+      checkEnd();
     });
-    collides("blade", "enemy", (blade) => {
+    const winLevel = /* @__PURE__ */ __name(() => {
+      wait(1, () => {
+        destroyAll("blade");
+        every("enemy", (enemy) => {
+          addKaboom(enemy.pos);
+          enemy.destroy();
+        });
+        shake(20);
+      });
+      wait(2, () => {
+        levelWin = true;
+        add([
+          rect(10 * UNITS, 6 * UNITS),
+          area(),
+          color(40, 40, 60),
+          pos(center()),
+          origin("center")
+        ]);
+        add([
+          "title",
+          text("Great!", { size: 40 }),
+          origin("center"),
+          pos(center().x, center().y - 20)
+        ]);
+        add([
+          "continue",
+          text("Click to continue", { size: 20 }),
+          origin("center"),
+          pos(center().x, center().y + 20)
+        ]);
+      });
+    }, "winLevel");
+    const incompleteLevel = /* @__PURE__ */ __name(() => {
+      wait(1, () => {
+        every("enemy", (enemy) => {
+          if (!enemy.disabled) {
+            enemy.color = rgb(240, 50, 50);
+          }
+        });
+        reset();
+      });
+    }, "incompleteLevel");
+    const checkEnd = /* @__PURE__ */ __name(() => {
+      let isEnded = launchState === "landed";
+      every("blade", (blade) => {
+        if (blade.speed > 0) {
+          isEnded = false;
+        }
+      });
+      if (isEnded) {
+        let isVictory = true;
+        every("enemy", (enemy) => {
+          if (!enemy.disabled) {
+            isVictory = false;
+          }
+        });
+        if (isVictory) {
+          winLevel();
+        } else {
+          incompleteLevel();
+        }
+      }
+    }, "checkEnd");
+    collides("blade", "enemy", (blade, enemy) => {
       blade.speed = 0;
+      enemy.disabled = true;
+      enemy.color = rgb(180, 180, 160);
       shake(10);
+      checkEnd();
     });
     collides("blade", "land", (blade) => {
       blade.speed = 0;
+      checkEnd();
     });
     action("blade", (blade) => {
       blade.move(dir(blade.throwAngle).scale(blade.speed * speedModifier()));
-    });
-    player.action(() => {
-      player.moveBy(player.sideSpeed * speedModifier(), -player.upSpeed * speedModifier());
-      if (!slowMo) {
-        player.upSpeed -= gravity;
-      }
-      const curAnim = player.curAnim();
-      if (launchState === "prelaunch" && curAnim !== "idle") {
-        player.play("idle", { loop: true, speed: 4 });
-      } else if (launchState === "launching" && curAnim !== "crouch") {
-        player.play("crouch", { loop: true, speed: 4 });
-      } else if (launchState === "launched") {
-        if (slowMo) {
-          if (curAnim === "somersault") {
-            player.play("throwing");
-          }
-          player.angle = throwArrow.angle;
-        } else {
-          if (curAnim === "crouch") {
-            player.play("startJump", { speed: 10 });
-          } else if (curAnim !== "somersault" && (curAnim !== "startJump" || player.frame >= START_JUMP_END_FRAME)) {
-            player.play("somersault", { loop: true });
-            player.angle = 0;
-            player.flipX(false);
-          }
-        }
-      } else if (launchState === "landed") {
-        if (!curAnim || curAnim === "somersault" || curAnim === "throwing") {
-          player.play("landing", { speed: 10 });
-          player.angle = 0;
-          player.flipX(false);
-        } else if (curAnim === "landing" && player.frame >= LANDING_END_FRAME) {
-          player.play("idle", { speed: 4, loop: true });
-        }
+      if (blade.pos.y >= height() || blade.pos.x >= width() || blade.pos.y < 0 || blade.pos.x < 0) {
+        destroy(blade);
+        checkEnd();
       }
     });
     let direction = 1;
-    launchArrow.action(() => {
+    action("launchArrow", (launchArrow2) => {
       if (launchState === "prelaunch") {
-        if (launchArrow.angle <= LAUNCH_ARROW_MIN_ANGLE) {
+        if (launchArrow2.angle <= LAUNCH_ARROW_MIN_ANGLE) {
           direction = 1;
-        } else if (launchArrow.angle >= LAUNCH_ARROW_MAX_ANGLE) {
+        } else if (launchArrow2.angle >= LAUNCH_ARROW_MAX_ANGLE) {
           direction = -1;
         }
-        launchArrow.angle = launchArrow.angle + direction * LAUNCH_ARROW_SPEED;
+        launchArrow2.angle = launchArrow2.angle + direction * LAUNCH_ARROW_SPEED;
       } else if (launchState === "launching") {
-        if (launchArrow.scale.x <= LAUNCH_ARROW_MAX_STRENGTH) {
-          launchArrow.scale = launchArrow.scale.add(LAUNCH_ARROW_STRENGHT_SPEED, LAUNCH_ARROW_STRENGHT_SPEED);
+        if (launchArrow2.scale.x <= LAUNCH_ARROW_MAX_STRENGTH) {
+          launchArrow2.scale = launchArrow2.scale.add(LAUNCH_ARROW_STRENGHT_SPEED, LAUNCH_ARROW_STRENGHT_SPEED);
         }
       } else if (launchState === "launched") {
-        launchArrow.destroy();
+        launchArrow2.destroy();
       }
     });
-    throwArrow.action(() => {
+    action("throwArrow", (throwArrow2) => {
       if (slowMo) {
-        throwArrow.angle += THROW_ARROW_SPEED;
-        if (throwArrow.angle === 360) {
+        throwArrow2.angle += THROW_ARROW_SPEED;
+        if (throwArrow2.angle === 360) {
           slowMo = false;
-          throwArrow.destroy();
+          launchState = "afterThrow";
+          throwArrow2.destroy();
         }
       }
-      throwArrow.pos = player.pos.add(0 * UNITS, 0 * UNITS);
+      throwArrow2.pos = player.pos.add(0 * UNITS, 0 * UNITS);
+    });
+    action("player", (player2) => {
+      player2.moveBy(player2.sideSpeed * speedModifier(), -player2.upSpeed * speedModifier());
+      if (!slowMo) {
+        player2.upSpeed -= gravity;
+      }
+      if (player2.pos.x > width() + 2 * UNITS || player2.pos.y > height() + 2 * UNITS) {
+        reset();
+      }
+      const curAnim = player2.curAnim();
+      if (launchState === "prelaunch" && curAnim !== "idle") {
+        player2.play("idle", { loop: true, speed: 4 });
+      } else if (launchState === "launching" && curAnim !== "crouch") {
+        player2.play("crouch", { loop: true, speed: 4 });
+      } else if (launchState === "launched" || launchState === "afterThrow") {
+        if (slowMo) {
+          if (curAnim === "somersault") {
+            player2.play("throwing");
+          }
+          player2.angle = throwArrow.angle;
+        } else {
+          if (curAnim === "crouch") {
+            player2.play("startJump", { speed: 10 });
+          } else if (curAnim !== "somersault" && (curAnim !== "startJump" || player2.frame >= START_JUMP_END_FRAME)) {
+            player2.play("somersault", { loop: true });
+            player2.flipX(false);
+            player2.angle = 0;
+          }
+        }
+      } else if (launchState === "landed" && player2.frame !== LANDING_END_FRAME) {
+        if (!curAnim || curAnim === "somersault" || curAnim === "throwing") {
+          player2.play("landing", { speed: 2 });
+          player2.flipX(false);
+          player2.angle = 0;
+        }
+      } else if (curAnim !== "idle" && (get("enemy").length === 0 || levelWin === true)) {
+        player2.play("idle", { loop: true, speed: 4 });
+      }
     });
   });
 
@@ -2626,6 +2827,36 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     const cta = add([
       "cta",
       text("Click to begin", { size: 30 }),
+      origin("center"),
+      pos(center().x, center().y + 50),
+      opacity(0)
+    ]);
+    loop(0.75, () => {
+      if (cta.opacity === 0) {
+        cta.opacity = 1;
+      } else {
+        cta.opacity = 0;
+      }
+    });
+    mouseClick(() => kaboom_default2.go("game"));
+  });
+
+  // code/scenes/win.js
+  kaboom_default2.scene("win", (args = {}) => {
+    add([
+      "background",
+      rect(width(), height()),
+      color(20, 20, 40)
+    ]);
+    add([
+      "title",
+      text("You Win!", { size: 60 }),
+      origin("center"),
+      pos(center().x, center().y - 100)
+    ]);
+    const cta = add([
+      "cta",
+      text("Click to play again", { size: 30 }),
       origin("center"),
       pos(center().x, center().y + 50),
       opacity(0)

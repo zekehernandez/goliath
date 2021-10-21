@@ -1,6 +1,7 @@
 import k from "../kaboom";
 import { UNITS } from '../constants';
 import { START_JUMP_END_FRAME, LANDING_END_FRAME } from '../main';
+import levels from '../levels';
 
 // general game consts
 const GRAVITY = 0.2;
@@ -21,47 +22,9 @@ const THROW_ARROW_SPEED = 2;
 const BLADE_SPEED = 1000;
 const BLADE_START_DISTANCE = 50;
 
-k.scene("game", (args = {}) => {
-  // game state
-  let launchState = "prelaunch";
-  let slowMo = false;
-  let gravity = 0;
-
-  let previousMouseDown = mouseIsDown();
-
-  const speedModifier = () => slowMo ? SLOW_MO_MODIFIER : 1;
-
-  /**
-   * Add Entities
-   */
-  
-
-  add([
-    "sky",
-		rect(width(), height()),
-		color(220, 240, 255),
-	]);
-
-  const overlay = add([
-		rect(width(), height()),
-		color(0, 0, 0),
-		opacity(0),
-	]);
-
-	overlay.action(() => {
-		if (slowMo) {
-			overlay.opacity = wave(0, 0.25, 1000);
-		} else {
-			overlay.color = rgb(0, 0, 0);
-			overlay.opacity = 0;
-		}
-	});
-
-  // player character
-  const player = add([
-    "player",
+const playerProps = [
+  "player",
     sprite("player"),
-    pos(3*UNITS, height() - 5*UNITS),
     scale(2, 2),
     z(1),
     area(),
@@ -69,88 +32,143 @@ k.scene("game", (args = {}) => {
     {
       sideSpeed: 0,
       upSpeed: 0,
-    }
-  ]);
+    },
+];
 
-  // launch arrow
-  const launchArrow = add([
-    "launchArrow",
-    sprite("arrow"),
-    scale(0.5, 0.5),
-    rotate(0),
-    pos(3*UNITS, height() - 5*UNITS),
-    origin("center"),
-    area(),
-  ]);
+const launchArrowProps = [
+  "launchArrow",
+  sprite("arrow"),
+  scale(0.5, 0.5),
+  rotate(0),
+  origin("center"),
+  area(),
+];
 
-  // starting rooftop
-  add([
-    "launch",
-    rect(4*UNITS, 4*UNITS),
-    pos(0, height() - 4*UNITS),
-    area(),
-    solid(),
-    outline(),
-    color(127, 200, 255),
-  ]);
+const throwArrowProps = [
+  "throwArrow",
+  sprite("arrow"),
+  scale(0.5, 0.5),
+  rotate(0),
+  pos(-2*UNITS, -2*UNITS),
+  origin("center"),
+  area(),
+  opacity(0),
+];
 
-  // landing rooftop 
-  add([
-    "land",
-    rect(24*UNITS, 3*UNITS),
-    pos(8*UNITS, height() - 3*UNITS),
-    area(),
-    solid(),
-    outline(),
-    color(127, 255, 255),
-  ]);
+k.scene("game", (args = {}) => {
+  // game state
+  let currentLevel;
+  let launchState;
+  let slowMo;
+  let gravity;
+  let previousMouseDown;
+  let levelWin;
 
-  // throw arrow
-  const throwArrow = add([
-    "throwArrow",
-    sprite("arrow"),
-    scale(0.5, 0.5),
-    rotate(0),
-    pos(-2*UNITS, -2*UNITS),
-    origin("center"),
-    area(),
-    opacity(0),
-  ]);
+  let player;
+  let launchArrow;
+  let throwArrow;
+  let overlay;
 
-  add([
-    "enemy",
-    rect(1*UNITS, 2*UNITS),
-    pos(10*UNITS, height() - 5*UNITS),
-    area(),
-    body(),
-    color(60, 230, 110),
-    outline(),
-  ]);
+  let startingPosition;
 
-  add([
-    "enemy",
-    rect(1*UNITS, 2*UNITS),
-    pos(18*UNITS, height() - 5*UNITS),
-    area(),
-    body(),
-    color(60, 230, 110),
-    outline(),
-  ]);
+  const speedModifier = () => slowMo ? SLOW_MO_MODIFIER : 1;
 
-  add([
-    "enemy",
-    rect(1*UNITS, 2*UNITS),
-    pos(24*UNITS, height() - 5*UNITS),
-    area(),
-    body(),
-    color(60, 230, 110),
-    outline(),
-  ]);
+  const startLevel = (newLevel) => {
+    // destroy any existing game objects
+    k.every((obj) => obj.destroy());
+
+    currentLevel = newLevel;
+    levelWin = false;
+    launchState = "prelaunch";
+    slowMo = false;
+    gravity = 0;
+    previousMouseDown = mouseIsDown();
+
+    add([
+      "sky",
+      rect(width(), height()),
+      color(220, 240, 255),
+    ]);
+
+    overlay = add([
+      rect(width(), height()),
+      color(0, 0, 0),
+      opacity(0),
+    ]);
+
+    overlay.action(() => {
+      if (slowMo) {
+        overlay.opacity = wave(0, 0.25, 1000);
+      } else {
+        overlay.color = rgb(0, 0, 0);
+        overlay.opacity = 0;
+      }
+    });
+
+    addLevel(levels[currentLevel], {
+      // define the size of each block
+      width: 48,
+      height: 48,
+      // define what each symbol means, by a function returning a comp list (what you'll pass to add())
+      "@": () => [...playerProps],
+      "+": () => [
+        "launch",
+        rect(1*UNITS, 1*UNITS),
+        area(),
+        solid(),
+        outline(),
+        color(127, 200, 255),
+      ],
+      "=": () => [
+        "land",
+        rect(1*UNITS, 1*UNITS),
+        area(),
+        solid(),
+        outline(),
+        color(127, 255, 255),
+      ],
+      "x": () => [
+        "enemy",
+        rect(1*UNITS, 2*UNITS),
+        area(),
+        body(),
+        color(60, 230, 110),
+        origin("left"),
+        outline(),
+        {
+          disabled: false,
+        },
+      ],
+    });
+
+    player = get("player")[0];
+    player.play("landing");
+    startingPosition = {...player.pos};
+
+    // launch arrow
+    launchArrow = add([...launchArrowProps, pos(player.pos)]);
+
+    // throw arrow
+    throwArrow = add([...throwArrowProps]);
+  }
+
+  startLevel(0);
 
   /**
    * Event Handling
    */
 
+  const reset = () => {
+    player.destroy();
+    throwArrow.destroy();
+    launchState = "prelaunch";
+    slowMo = false;
+    gravity = 0;
+    player = add([...playerProps, pos(startingPosition)]);
+    player.play("landing");
+    launchArrow = add([...launchArrowProps, pos(startingPosition)]);
+    throwArrow = add([...throwArrowProps]);
+  }
 
   // throwing
   const startThrow = () => {
@@ -176,6 +194,12 @@ k.scene("game", (args = {}) => {
       startThrow();
     } else if (slowMo) {
       throwBlade();
+    } else if (levelWin) {
+      if (currentLevel + 1 === levels.length) {
+        go("win");
+      } else {
+        startLevel(currentLevel + 1);
+      }
     }
   }
 
@@ -219,80 +243,118 @@ k.scene("game", (args = {}) => {
   keyRelease("space", actionUp);
   keyPress("space", gameAction);
 
-  keyPress("tab", () => k.go("game"))
+  keyPress("tab", () => startLevel(currentLevel))
 
   // landing
-  collides("player", "land", () => {
+  collides("player", "land", (player, land) => {
     launchState = "landed";
     player.sideSpeed = 0;
     player.upSpeed = 0;
     gravity = 0;
     slowMo = false;
     throwArrow.destroy();
-    shake(20); // why not?
+    checkEnd();
   });
 
-  collides("blade", "enemy", (blade) => {
+  const winLevel = () => {
+    wait(1, () => {
+      destroyAll("blade");
+      every("enemy", enemy => {
+        addKaboom(enemy.pos);
+        enemy.destroy();
+      });
+      shake(20); // why not?
+    });
+ 
+    wait(2, () => {
+      levelWin = true;
+
+      add([
+        rect(10*UNITS, 6*UNITS),
+        area(),
+        color(40, 40, 60),
+        pos(center()),
+        origin("center"),
+      ]);
+
+      add([
+        "title",
+        text("Great!", { size: 40 }),
+        origin("center"),
+        pos(center().x, center().y - 20),
+      ]);
+
+      add([
+        "continue",
+        text("Click to continue", { size: 20 }),
+        origin("center"),
+        pos(center().x, center().y + 20),
+      ]);
+    })
+  }
+
+  const incompleteLevel = () => {
+    wait(1, () => {
+      every("enemy", enemy => {
+        if (!enemy.disabled) {
+          enemy.color = rgb(240, 50, 50);
+        }
+      });
+
+      reset();
+    });
+  };
+
+  const checkEnd = () => {
+    let isEnded = launchState === "landed";
+    every("blade", blade => {
+      if (blade.speed > 0) {
+        isEnded = false;
+      }
+    })
+
+    if (isEnded) {
+      let isVictory = true;
+      every("enemy", enemy => {
+        if (!enemy.disabled) {
+          isVictory = false;
+        }
+      });
+
+      if (isVictory) {
+        winLevel();
+      } else {
+        incompleteLevel();
+      }
+    }
+  }
+
+  collides("blade", "enemy", (blade, enemy) => {
     blade.speed = 0;
+    enemy.disabled = true;
+    enemy.color = rgb(180, 180, 160);
     shake(10);
+    checkEnd();
   });
 
   collides("blade", "land", (blade) => {
     blade.speed = 0;
+    checkEnd();
   });
 
   action("blade", (blade) => {
     blade.move(dir(blade.throwAngle).scale(blade.speed * speedModifier()));
-  });
 
-  /** 
-   * Game Loops
-   */
-
-  // player movement
-  player.action(() => {
-    player.moveBy(player.sideSpeed * speedModifier(), -player.upSpeed * speedModifier());
-    if (!slowMo) {
-      player.upSpeed -= gravity;  
-    }
-
-    // I have to manage the animation transitions like this because onEnd()
-    const curAnim = player.curAnim();
-    if (launchState === "prelaunch" && curAnim !== "idle") {
-      player.play("idle", { loop: true, speed: 4 });
-    } else if (launchState === "launching" && curAnim !== "crouch") {
-      player.play("crouch", { loop: true, speed: 4 });
-    } else if (launchState === "launched") {
-      if (slowMo) {
-        if (curAnim === "somersault") {
-          player.play("throwing");
-        }
-
-
-        player.angle = throwArrow.angle;
-      } else {
-        if (curAnim === "crouch") {
-          player.play("startJump", { speed: 10 });
-        } else if (curAnim !== "somersault" && (curAnim !== "startJump" || player.frame >= START_JUMP_END_FRAME)) {
-          player.play("somersault", { loop: true });
-          player.angle = 0;
-          player.flipX(false);
-        } 
-      }
-    } else if (launchState === "landed") {
-      if (!curAnim || curAnim === "somersault" || curAnim === "throwing") {
-        player.play("landing", { speed: 10 });
-        player.angle = 0;
-        player.flipX(false);
-      } else if (curAnim === "landing" && player.frame >= LANDING_END_FRAME) {
-        player.play("idle", { speed: 4, loop: true });
-      } 
+    if (blade.pos.y >= height() || blade.pos.x >= width() 
+    || blade.pos.y < 0 || blade.pos.x < 0) {
+      destroy(blade);
+      checkEnd();
     }
   });
 
   // launch arrow movement
   let direction = 1;
-  launchArrow.action(() => {
+  action("launchArrow", launchArrow => {
     if (launchState === "prelaunch") {
       if (launchArrow.angle <= LAUNCH_ARROW_MIN_ANGLE) {
         direction = 1;
@@ -310,15 +372,61 @@ k.scene("game", (args = {}) => {
   })
 
   // throw arrow movement
-  throwArrow.action(() => {
+  action("throwArrow", throwArrow => {
     if (slowMo) {
       throwArrow.angle += THROW_ARROW_SPEED;
       if (throwArrow.angle === 360) {
         slowMo = false;
+        launchState = "afterThrow";
         throwArrow.destroy();
       }
     }
 
     throwArrow.pos = player.pos.add(0*UNITS, 0*UNITS);
+  });
+
+    // player movement
+  action("player", player => {
+    player.moveBy(player.sideSpeed * speedModifier(), -player.upSpeed * speedModifier());
+    if (!slowMo) {
+      player.upSpeed -= gravity;  
+    }
+
+    if (player.pos.x > width() + 2*UNITS || player.pos.y > height() + 2*UNITS) {
+      reset();
+    }
+
+    // I have to manage the animation transitions like this because onEnd()
+    const curAnim = player.curAnim();
+    if (launchState === "prelaunch" && curAnim !== "idle") {
+      player.play("idle", { loop: true, speed: 4 });
+    } else if (launchState === "launching" && curAnim !== "crouch") {
+      player.play("crouch", { loop: true, speed: 4 });
+    } else if (launchState === "launched" || launchState === "afterThrow") {
+      if (slowMo) {
+        if (curAnim === "somersault") {
+          player.play("throwing");
+        }
+
+
+        player.angle = throwArrow.angle;
+      } else {
+        if (curAnim === "crouch") {
+          player.play("startJump", { speed: 10 });
+        } else if (curAnim !== "somersault" && (curAnim !== "startJump" || player.frame >= START_JUMP_END_FRAME)) {
+          player.play("somersault", { loop: true });
+          player.flipX(false);
+          player.angle = 0;
+        } 
+      }
+    } else if (launchState === "landed" && player.frame !== LANDING_END_FRAME) {
+      if (!curAnim || curAnim === "somersault" || curAnim === "throwing") {
+        player.play("landing", { speed: 2 });
+        player.flipX(false);
+        player.angle = 0;
+      }
+    } else if (curAnim !== "idle" && (get("enemy").length === 0 || levelWin === true)) {
+      player.play("idle", { loop: true, speed: 4});
+    }
   });
 });
