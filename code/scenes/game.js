@@ -1,14 +1,12 @@
 import k from "../kaboom";
 import { UNITS } from '../constants';
+import { COLORS } from '../game.constants';
 import { START_JUMP_END_FRAME, LANDING_END_FRAME } from '../main';
 import levels from '../levels';
-
-const COLORS = {
-  BLACK: rgb(0, 0, 0),
-  GREY: rgb(180, 180, 160),
-  RED: rgb(240, 50, 50),
-  GREEN: rgb(60, 230, 110),
-}
+import { createPlayer, registerPlayerActions } from '../entities/player';
+import { moverProps } from '../entities';
+import { registerCollisions } from '../events/collisions';
+import state, { resetLevelState } from '../state';
 
 // general game consts
 const GRAVITY = 0.2;
@@ -31,26 +29,9 @@ const THROW_ARROW_SPEED = 2;
 const BLADE_SPEED = 1000;
 const BLADE_START_DISTANCE = 50;
 
-const moverProps = {
-  sideSpeed: 0,
-  upSpeed: 0,
-};
-
 const kickableProps = {
   kickDirection: 0,
 };
-
-const playerComps = [
-  "player",
-    sprite("player"),
-    scale(2, 2),
-    z(1),
-    area(),
-    origin("center"),
-    {
-      ...moverProps,
-    },
-];
 
 const launchArrowComps = [
   "launchArrow",
@@ -79,24 +60,18 @@ k.scene("game", (args = {}) => {
   let smokeBombCount = STARTING_SMOKE_BOMB_COUNT;
 
   // level state
-  let launchState;
-  let slowMo;
   let previousMouseDown;
-  let levelWin;
-  let isKicking;
-
-  let player;
+  let misses;
+  
   let launchArrow;
-  let throwArrow;
   let overlay;
   let ammoCounter;
   let smokeBombCounter;
-  let ammoRecovered = 0;
-  let misses;
+
 
   let startingPosition;
 
-  const speedModifier = () => slowMo ? SLOW_MO_MODIFIER : 1;
+  const speedModifier = () => state.level.isSlowMo ? SLOW_MO_MODIFIER : 1;
   const getAmmoCounterText = () => `Ammo: ${ammoCount}`;
   const getSmokeBombCounterText = () => `Smoke Bombs: ${smokeBombCount}`;
 
@@ -110,7 +85,7 @@ k.scene("game", (args = {}) => {
     // destroy any existing game objects
     k.every((obj) => obj.destroy());
 
-    ammoCount += ammoRecovered;
+    ammoCount += state.level.ammoRecovered;
 
     ammoCounter = add([
       "ammoCounter",
@@ -129,12 +104,9 @@ k.scene("game", (args = {}) => {
     ]);
 
     currentLevel = newLevel;
-    levelWin = false;
-    launchState = "prelaunch";
-    slowMo = false;
-    isKicking = false;
+    resetLevelState();
     previousMouseDown = mouseIsDown();
-    ammoRecovered = 0;
+    state.level.ammoRecovered = 0;
     misses = 0;
 
     add([
@@ -152,7 +124,7 @@ k.scene("game", (args = {}) => {
     ]);
 
     overlay.action(() => {
-      if (slowMo) {
+      if (state.level.isSlowMo) {
         overlay.opacity = wave(0, 0.25, 1000);
       } else {
         overlay.color = rgb(0, 0, 0);
@@ -165,7 +137,7 @@ k.scene("game", (args = {}) => {
       width: 48,
       height: 48,
       // define what each symbol means, by a function returning a comp list (what you'll pass to add())
-      "@": () => [...playerComps],
+      "@": () => createPlayer(),
       "+": () => [
         "launch",
         rect(1*UNITS, 1*UNITS),
@@ -212,7 +184,7 @@ k.scene("game", (args = {}) => {
       ],
     });
 
-    player = get("player")[0];
+    const player = get("player")[0];
     player.play("landing");
     startingPosition = {...player.pos};
 
@@ -220,7 +192,7 @@ k.scene("game", (args = {}) => {
     launchArrow = add([...launchArrowComps, pos(player.pos)]);
 
     // throw arrow
-    throwArrow = add([...throwArrowComps, follow(player)]);
+    add([...throwArrowComps, follow(player)]);
   }
 
   startLevel(0);
@@ -231,15 +203,14 @@ k.scene("game", (args = {}) => {
 
   const reset = () => {
     useSmokeBomb();
-    player.destroy();
-    throwArrow.destroy();
+    destroyAll("player");
+    destroyAll("throwArrow");
     launchArrow.destroy();
-    launchState = "prelaunch";
-    slowMo = false;
-    player = add([...playerComps, pos(startingPosition)]);
+    state.level.isSlowMo = false;
+    let player = add(createPlayer([pos(startingPosition)]));
     player.play("landing");
     launchArrow = add([...launchArrowComps, pos(startingPosition)]);
-    throwArrow = add([...throwArrowComps, follow(player)]);
+    add([...throwArrowComps, follow(player)]);
   }
 
   const attemptReset = () => {
@@ -272,10 +243,14 @@ k.scene("game", (args = {}) => {
 
   // throwing
   const startThrow = () => {
-    slowMo = true;
+    const player = get("player")[0];
+    const throwArrow = get("throwArrow")[0];
+    player.isThrowing = true;
+    state.level.isSlowMo = true;
     throwArrow.opacity = 1;
   };
   const throwBlade = () => {
+    const throwArrow = get("throwArrow")[0];
     const bladePos = throwArrow.pos.add(dir(throwArrow.angle - 90).scale(BLADE_START_DISTANCE));
     add([
       "blade",
@@ -285,6 +260,7 @@ k.scene("game", (args = {}) => {
       {
         speed: BLADE_SPEED,
         throwAngle: throwArrow.angle - 90,
+        isRecovered: false,
         ...moverProps,
       }
     ]);
@@ -292,11 +268,12 @@ k.scene("game", (args = {}) => {
   };
 
   const gameAction = () => {
-    if (launchState === "launched" && !slowMo) {
+    const player = get("player")[0];
+    if (player.state === "launched" && !player.isThrowing && !player.isKicking) {
       ammoCount > 0 ? startThrow() : flashAmmo();
-    } else if (slowMo) {
+    } else if (player.isThrowing) {
       ammoCount > 0 ? throwBlade() : flashAmmo();
-    } else if (levelWin) {
+    } else if (state.level.isWon) {
       if (currentLevel + 1 === levels.length) {
         go("win");
       } else {
@@ -306,14 +283,17 @@ k.scene("game", (args = {}) => {
   }
 
   const actionDown = () => {
-  if (launchState === "prelaunch") {
-      launchState = "launching";
+    const player = get("player")[0];
+    if (player.state === "prelaunch") {
+      player.state = "launching";
     }
   }
 
   const actionUp = () => {
-    if (launchState === "launching") {
-      launchState = "launched"
+    const player = get("player")[0];
+
+    if (player.state === "launching") {
+      player.state = "launched"
       const start = vec2(0,0);
       const end = start.add((dir(LAUNCH_ARROW_MAX_ANGLE - launchArrow.angle).scale(launchArrow.scale.scale(LAUNCH_ARROW_STRENGTH_MODIFIER))));
 
@@ -388,8 +368,8 @@ k.scene("game", (args = {}) => {
 
         wait(1, () => {
           add([
-            "ammorecovered",
-            text(`Ammo Recovered: ${ammoRecovered}`, { size: 14 }),
+            "ammoRecovered",
+            text(`Ammo Recovered: ${state.level.ammoRecovered}`, { size: 14 }),
             origin("center"),
             pos(stats.pos.x, stats.pos.y + 3*UNITS),
             layer('ui'),
@@ -406,7 +386,7 @@ k.scene("game", (args = {}) => {
             ]);
             shake(20);
 
-            levelWin = true;
+            state.level.isWon = true;
           });
         }); 
       });
@@ -428,7 +408,8 @@ k.scene("game", (args = {}) => {
   };
 
   const checkEnd = () => {
-    let isEnded = launchState === "landed";
+    const player = get("player")[0];
+    let isEnded = player.state === "landed";
     every("blade", blade => {
       if (blade.speed > 0) {
         isEnded = false;
@@ -443,80 +424,13 @@ k.scene("game", (args = {}) => {
         }
       });
 
-      console.log('hello what is happening');
       if (isVictory) {
         winLevel();
       } else {
         incompleteLevel();
       }
     }
-  }
-
-  collides("mover", "land", (mover) => {
-      mover.unuse("mover");
-      mover.sideSpeed = 0;
-      mover.upSpeed = 0;
-      shake(10);
-  });
-
-  // landing
-  collides("player", "land", (player, land) => {
-    if (launchState !== "landed") {
-      launchState = "landed";
-      slowMo = false;
-      throwArrow.destroy();
-      checkEnd();
-    }
-  });
-
-  collides("blade", "enemy", (blade, enemy) => {
-    const wasPreviouslyDisabled = enemy.disabled;
-    blade.speed = 0;
-    enemy.disabled = true;
-    enemy.color = COLORS.GREY;
-    ammoRecovered++;
-    shake(5);
-    !wasPreviouslyDisabled && checkEnd();
-  });
-
-  collides("blade", "flier", (blade, flier) => {
-    flier.use("mover");
-    blade.use(follow(flier, blade.pos.sub(flier.pos)));
-
-    const direction = dir(blade.throwAngle).scale(4)
-    console.log({ angle: blade.throwAngle, direction });
-    flier.sideSpeed = direction.x;
-    flier.upSpeed = -direction.y;
-  });
-
-  collides("blade", "land", (blade) => {
-    blade.speed = 0;
-    ammoRecovered++;
-    misses++;
-    checkEnd();
-  });
-
-  collides("player", "flier", (player, flier) => {
-    if (!flier.disabled) {
-      shake(10);
-      player.sideSpeed = 0;
-    }
-  });
-
-  collides("player", "kickable", (player, kickable) => {
-    if (kickable.disabled === false) {
-      isKicking = true;
-      slowMo = true;
-      kickable.disabled = true;
-      kickable.color = COLORS.GREY;
-      shake(10);
-      wait(1, () => {
-        kickable.kickDirection = player.pos.sub(kickable.pos).x;
-        slowMo = false;
-        isKicking = false;
-      })
-    }
-  });
+  };
 
   action("blade", (blade) => {
     blade.move(dir(blade.throwAngle).scale(blade.speed * speedModifier()));
@@ -538,29 +452,34 @@ k.scene("game", (args = {}) => {
   // launch arrow movement
   let direction = 1;
   action("launchArrow", launchArrow => {
-    if (launchState === "prelaunch") {
+    const player = get("player")[0];
+
+    if (player.state === "prelaunch") {
       if (launchArrow.angle <= LAUNCH_ARROW_MIN_ANGLE) {
         direction = 1;
       } else if (launchArrow.angle >= LAUNCH_ARROW_MAX_ANGLE) {
         direction = -1;
       }
       launchArrow.angle = launchArrow.angle + (direction * LAUNCH_ARROW_SPEED);
-    } else if (launchState === "launching") {
+    } else if (player.state === "launching") {
       if (launchArrow.scale.x <= LAUNCH_ARROW_MAX_STRENGTH) {
             launchArrow.scale = launchArrow.scale.add(LAUNCH_ARROW_STRENGHT_SPEED, LAUNCH_ARROW_STRENGHT_SPEED);
       }
-    } else if (launchState === "launched") {
+    } else if (player.state === "launched") {
       launchArrow.destroy();
     }
   })
 
   // throw arrow movement
   action("throwArrow", throwArrow => {
-    if (slowMo) {
+    const player = get("player")[0];
+
+    if (state.level.isSlowMo) {
       throwArrow.angle += THROW_ARROW_SPEED;
       if (throwArrow.angle === 360) {
-        slowMo = false;
-        launchState = "afterThrow";
+        state.level.isSlowMo = false;
+        player.state = "afterThrow";
+        player.isThrowing = false;
         throwArrow.destroy();
       }
     }
@@ -569,50 +488,11 @@ k.scene("game", (args = {}) => {
   action("mover", mover => {
     mover.moveBy(mover.sideSpeed * speedModifier(), -mover.upSpeed * speedModifier());
 
-    if (!slowMo) {
+    if (!state.level.isSlowMo) {
       mover.upSpeed -= gravity;  
     }
   });
 
-    // player movement
-  action("player", player => {
-    if (player.pos.x > width() + 2*UNITS || player.pos.y > height() + 2*UNITS) {
-      attemptReset();
-    }
-
-    // I have to manage the animation transitions like this because onEnd()
-    const curAnim = player.curAnim();
-    if (isKicking) {
-      player.play("kicking", { loop: true })
-    } else if (launchState === "prelaunch" && curAnim !== "idle") {
-      player.play("idle", { loop: true, speed: 4 });
-    } else if (launchState === "launching" && curAnim !== "crouch") {
-      player.play("crouch", { loop: true, speed: 4 });
-    } else if (launchState === "launched" || launchState === "afterThrow") {
-      if (slowMo) {
-        if (curAnim === "somersault") {
-          player.play("throwing", { loop: true });
-        }
-
-
-        player.angle = throwArrow.angle;
-      } else {
-        if (curAnim === "crouch") {
-          player.play("startJump", { speed: 10 });
-        } else if (curAnim !== "somersault" && (curAnim !== "startJump" || player.frame >= START_JUMP_END_FRAME)) {
-          player.play("somersault", { loop: true });
-          player.flipX(false);
-          player.angle = 0;
-        } 
-      }
-    } else if (launchState === "landed" && player.frame !== LANDING_END_FRAME) {
-      if (!curAnim || curAnim === "somersault" || curAnim === "throwing" || curAnim === "kicking") {
-        player.play("landing", { speed: 2 });
-        player.flipX(false);
-        player.angle = 0;
-      }
-    } else if (curAnim !== "idle" && (get("enemy").length === 0 || levelWin === true)) {
-      player.play("idle", { loop: true, speed: 4});
-    }
-  });
+  registerPlayerActions({ attemptReset });
+  registerCollisions({ checkEnd });
 });

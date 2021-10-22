@@ -1,5 +1,7 @@
 (() => {
   var __defProp = Object.defineProperty;
+  var __defProps = Object.defineProperties;
+  var __getOwnPropDescs = Object.getOwnPropertyDescriptors;
   var __getOwnPropSymbols = Object.getOwnPropertySymbols;
   var __hasOwnProp = Object.prototype.hasOwnProperty;
   var __propIsEnum = Object.prototype.propertyIsEnumerable;
@@ -15,6 +17,7 @@
       }
     return a;
   };
+  var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
   var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
   // node_modules/kaboom/dist/kaboom.mjs
@@ -2371,6 +2374,14 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
   var k = kaboom_default({ width: 32 * UNITS, height: 18 * UNITS, font: "sink" });
   var kaboom_default2 = k;
 
+  // code/game.constants.js
+  var COLORS = {
+    BLACK: rgb(0, 0, 0),
+    GREY: rgb(180, 180, 160),
+    RED: rgb(240, 50, 50),
+    GREEN: rgb(60, 230, 110)
+  };
+
   // code/levels.js
   var levels_default = [
     [
@@ -2457,13 +2468,156 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     ]
   ];
 
-  // code/scenes/game.js
-  var COLORS = {
-    BLACK: rgb(0, 0, 0),
-    GREY: rgb(180, 180, 160),
-    RED: rgb(240, 50, 50),
-    GREEN: rgb(60, 230, 110)
+  // code/entities/index.js
+  var moverProps = {
+    sideSpeed: 0,
+    upSpeed: 0
   };
+
+  // code/state.js
+  var defaultLevel = {
+    isWon: false,
+    isSlowMo: false,
+    ammoRecovered: 0,
+    misses: 0
+  };
+  var state = {
+    level: __spreadValues({}, defaultLevel)
+  };
+  var resetLevelState = /* @__PURE__ */ __name(() => {
+    state.level = __spreadValues({}, defaultLevel);
+  }, "resetLevelState");
+  var state_default = state;
+
+  // code/entities/player.js
+  var playerComps = [
+    "player",
+    sprite("player"),
+    scale(2, 2),
+    z(1),
+    area(),
+    origin("center"),
+    __spreadProps(__spreadValues({}, moverProps), {
+      state: "prelaunch",
+      isKicking: false,
+      isThrowing: false
+    })
+  ];
+  var createPlayer = /* @__PURE__ */ __name((otherProps = []) => {
+    return [...playerComps, ...otherProps];
+  }, "createPlayer");
+  var registerPlayerActions = /* @__PURE__ */ __name(({ attemptReset }) => {
+    action("player", (player) => {
+      if (player.pos.x > width() + 2 * UNITS || player.pos.y > height() + 2 * UNITS) {
+        attemptReset();
+      }
+      const curAnim = player.curAnim();
+      if (player.isKicking) {
+        player.play("kicking", { loop: true });
+      } else if (player.state === "prelaunch" && curAnim !== "idle") {
+        player.play("idle", { loop: true, speed: 4 });
+      } else if (player.state === "launching" && curAnim !== "crouch") {
+        player.play("crouch", { loop: true, speed: 4 });
+      } else if (player.state === "launched" || player.state === "afterThrow") {
+        if (player.isThrowing) {
+          if (curAnim !== "throwing") {
+            player.play("throwing", { loop: true });
+          }
+          const throwArrow = get("throwArrow")[0];
+          player.angle = throwArrow.angle;
+        } else {
+          if (curAnim === "crouch") {
+            player.play("startJump", { speed: 10 });
+          } else if (curAnim !== "somersault" && (curAnim !== "startJump" || player.frame >= START_JUMP_END_FRAME)) {
+            player.play("somersault", { loop: true });
+            player.flipX(false);
+            player.angle = 0;
+          }
+        }
+      } else if (player.state === "landed" && player.frame !== LANDING_END_FRAME) {
+        if (!curAnim || curAnim === "somersault" || curAnim === "throwing" || curAnim === "kicking") {
+          player.play("landing", { speed: 2 });
+          player.flipX(false);
+          player.angle = 0;
+        }
+      } else if (curAnim !== "idle" && (get("enemy").length === 0 || state_default.level.isWon === true)) {
+        player.play("idle", { loop: true, speed: 4 });
+      }
+    });
+  }, "registerPlayerActions");
+
+  // code/events/collisions.js
+  var registerCollisions = /* @__PURE__ */ __name(({ checkEnd }) => {
+    const attemptAmmoRecover = /* @__PURE__ */ __name((blade) => {
+      if (!blade.isRecovered) {
+        state_default.level.ammoRecovered++;
+        blade.isRecovered = true;
+      }
+    }, "attemptAmmoRecover");
+    collides("mover", "land", (mover) => {
+      mover.unuse("mover");
+      mover.sideSpeed = 0;
+      mover.upSpeed = 0;
+      shake(10);
+    });
+    collides("player", "land", (player, land) => {
+      if (player.state !== "landed") {
+        player.state = "landed";
+        player.isKicking = false;
+        player.isThrowing = false;
+        state_default.level.isSlowMo = false;
+        destroyAll("throwArrow");
+        checkEnd();
+      }
+    });
+    collides("blade", "enemy", (blade, enemy) => {
+      const wasPreviouslyDisabled = enemy.disabled;
+      blade.speed = 0;
+      enemy.disabled = true;
+      enemy.color = COLORS.GREY;
+      attemptAmmoRecover(blade);
+      shake(5);
+      if (!wasPreviouslyDisabled) {
+        checkEnd();
+      }
+    });
+    collides("blade", "flier", (blade, flier) => {
+      flier.use("mover");
+      blade.use(follow(flier, blade.pos.sub(flier.pos)));
+      attemptAmmoRecover(blade);
+      const direction = dir(blade.throwAngle).scale(4);
+      flier.sideSpeed = direction.x;
+      flier.upSpeed = -direction.y;
+    });
+    collides("blade", "land", (blade) => {
+      blade.speed = 0;
+      attemptAmmoRecover(blade);
+      state_default.level.misses++;
+      checkEnd();
+    });
+    collides("player", "flier", (player, flier) => {
+      if (!flier.disabled) {
+        shake(10);
+        player.sideSpeed = 0;
+      }
+    });
+    collides("player", "kickable", (player, kickable) => {
+      if (kickable.disabled === false) {
+        player.isKicking = true;
+        state_default.level.isSlowMo = true;
+        kickable.disabled = true;
+        kickable.color = COLORS.GREY;
+        shake(10);
+        wait(1, () => {
+          kickable.kickDirection = player.pos.sub(kickable.pos).x;
+          state_default.level.isSlowMo = false;
+          player.isKicking = false;
+        });
+      }
+    });
+  }, "registerCollisions");
+
+  // code/scenes/game.js
   var GRAVITY = 0.2;
   var SLOW_MO_MODIFIER = 0.045;
   var STARTING_AMMO_COUNT = 3;
@@ -2477,22 +2631,9 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
   var THROW_ARROW_SPEED = 2;
   var BLADE_SPEED = 1e3;
   var BLADE_START_DISTANCE = 50;
-  var moverProps = {
-    sideSpeed: 0,
-    upSpeed: 0
-  };
   var kickableProps = {
     kickDirection: 0
   };
-  var playerComps = [
-    "player",
-    sprite("player"),
-    scale(2, 2),
-    z(1),
-    area(),
-    origin("center"),
-    __spreadValues({}, moverProps)
-  ];
   var launchArrowComps = [
     "launchArrow",
     sprite("arrow"),
@@ -2515,21 +2656,14 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     let currentLevel;
     let ammoCount = STARTING_AMMO_COUNT;
     let smokeBombCount = STARTING_SMOKE_BOMB_COUNT;
-    let launchState;
-    let slowMo;
     let previousMouseDown;
-    let levelWin;
-    let isKicking;
-    let player;
+    let misses;
     let launchArrow;
-    let throwArrow;
     let overlay;
     let ammoCounter;
     let smokeBombCounter;
-    let ammoRecovered = 0;
-    let misses;
     let startingPosition;
-    const speedModifier = /* @__PURE__ */ __name(() => slowMo ? SLOW_MO_MODIFIER : 1, "speedModifier");
+    const speedModifier = /* @__PURE__ */ __name(() => state_default.level.isSlowMo ? SLOW_MO_MODIFIER : 1, "speedModifier");
     const getAmmoCounterText = /* @__PURE__ */ __name(() => `Ammo: ${ammoCount}`, "getAmmoCounterText");
     const getSmokeBombCounterText = /* @__PURE__ */ __name(() => `Smoke Bombs: ${smokeBombCount}`, "getSmokeBombCounterText");
     layers([
@@ -2539,7 +2673,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     ], "game");
     const startLevel = /* @__PURE__ */ __name((newLevel) => {
       kaboom_default2.every((obj) => obj.destroy());
-      ammoCount += ammoRecovered;
+      ammoCount += state_default.level.ammoRecovered;
       ammoCounter = add([
         "ammoCounter",
         text(getAmmoCounterText(), { font: "sink", size: 24 }),
@@ -2555,12 +2689,9 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         color(smokeBombCount > 0 ? COLORS.BLACK : COLORS.RED)
       ]);
       currentLevel = newLevel;
-      levelWin = false;
-      launchState = "prelaunch";
-      slowMo = false;
-      isKicking = false;
+      resetLevelState();
       previousMouseDown = mouseIsDown();
-      ammoRecovered = 0;
+      state_default.level.ammoRecovered = 0;
       misses = 0;
       add([
         "sky",
@@ -2575,7 +2706,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         layer("bg")
       ]);
       overlay.action(() => {
-        if (slowMo) {
+        if (state_default.level.isSlowMo) {
           overlay.opacity = wave(0, 0.25, 1e3);
         } else {
           overlay.color = rgb(0, 0, 0);
@@ -2585,7 +2716,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       addLevel(levels_default[currentLevel], {
         width: 48,
         height: 48,
-        "@": () => [...playerComps],
+        "@": () => createPlayer(),
         "+": () => [
           "launch",
           rect(1 * UNITS, 1 * UNITS),
@@ -2629,24 +2760,23 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
           }, moverProps)
         ]
       });
-      player = get("player")[0];
+      const player = get("player")[0];
       player.play("landing");
       startingPosition = __spreadValues({}, player.pos);
       launchArrow = add([...launchArrowComps, pos(player.pos)]);
-      throwArrow = add([...throwArrowComps, follow(player)]);
+      add([...throwArrowComps, follow(player)]);
     }, "startLevel");
     startLevel(0);
     const reset = /* @__PURE__ */ __name(() => {
       useSmokeBomb();
-      player.destroy();
-      throwArrow.destroy();
+      destroyAll("player");
+      destroyAll("throwArrow");
       launchArrow.destroy();
-      launchState = "prelaunch";
-      slowMo = false;
-      player = add([...playerComps, pos(startingPosition)]);
+      state_default.level.isSlowMo = false;
+      let player = add(createPlayer([pos(startingPosition)]));
       player.play("landing");
       launchArrow = add([...launchArrowComps, pos(startingPosition)]);
-      throwArrow = add([...throwArrowComps, follow(player)]);
+      add([...throwArrowComps, follow(player)]);
     }, "reset");
     const attemptReset = /* @__PURE__ */ __name(() => {
       if (smokeBombCount > 0) {
@@ -2673,10 +2803,14 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       }
     }, "useSmokeBomb");
     const startThrow = /* @__PURE__ */ __name(() => {
-      slowMo = true;
+      const player = get("player")[0];
+      const throwArrow = get("throwArrow")[0];
+      player.isThrowing = true;
+      state_default.level.isSlowMo = true;
       throwArrow.opacity = 1;
     }, "startThrow");
     const throwBlade = /* @__PURE__ */ __name(() => {
+      const throwArrow = get("throwArrow")[0];
       const bladePos = throwArrow.pos.add(dir(throwArrow.angle - 90).scale(BLADE_START_DISTANCE));
       add([
         "blade",
@@ -2685,17 +2819,19 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         pos(bladePos),
         __spreadValues({
           speed: BLADE_SPEED,
-          throwAngle: throwArrow.angle - 90
+          throwAngle: throwArrow.angle - 90,
+          isRecovered: false
         }, moverProps)
       ]);
       useAmmo();
     }, "throwBlade");
     const gameAction = /* @__PURE__ */ __name(() => {
-      if (launchState === "launched" && !slowMo) {
+      const player = get("player")[0];
+      if (player.state === "launched" && !player.isThrowing && !player.isKicking) {
         ammoCount > 0 ? startThrow() : flashAmmo();
-      } else if (slowMo) {
+      } else if (player.isThrowing) {
         ammoCount > 0 ? throwBlade() : flashAmmo();
-      } else if (levelWin) {
+      } else if (state_default.level.isWon) {
         if (currentLevel + 1 === levels_default.length) {
           go("win");
         } else {
@@ -2704,13 +2840,15 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       }
     }, "gameAction");
     const actionDown = /* @__PURE__ */ __name(() => {
-      if (launchState === "prelaunch") {
-        launchState = "launching";
+      const player = get("player")[0];
+      if (player.state === "prelaunch") {
+        player.state = "launching";
       }
     }, "actionDown");
     const actionUp = /* @__PURE__ */ __name(() => {
-      if (launchState === "launching") {
-        launchState = "launched";
+      const player = get("player")[0];
+      if (player.state === "launching") {
+        player.state = "launched";
         const start = vec2(0, 0);
         const end = start.add(dir(LAUNCH_ARROW_MAX_ANGLE - launchArrow.angle).scale(launchArrow.scale.scale(LAUNCH_ARROW_STRENGTH_MODIFIER)));
         player.use("mover");
@@ -2774,8 +2912,8 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
           shake(10);
           wait(1, () => {
             add([
-              "ammorecovered",
-              text(`Ammo Recovered: ${ammoRecovered}`, { size: 14 }),
+              "ammoRecovered",
+              text(`Ammo Recovered: ${state_default.level.ammoRecovered}`, { size: 14 }),
               origin("center"),
               pos(stats.pos.x, stats.pos.y + 3 * UNITS),
               layer("ui")
@@ -2790,7 +2928,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
                 layer("ui")
               ]);
               shake(20);
-              levelWin = true;
+              state_default.level.isWon = true;
             });
           });
         });
@@ -2809,7 +2947,8 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       });
     }, "incompleteLevel");
     const checkEnd = /* @__PURE__ */ __name(() => {
-      let isEnded = launchState === "landed";
+      const player = get("player")[0];
+      let isEnded = player.state === "landed";
       every("blade", (blade) => {
         if (blade.speed > 0) {
           isEnded = false;
@@ -2822,7 +2961,6 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
             isVictory = false;
           }
         });
-        console.log("hello what is happening");
         if (isVictory) {
           winLevel();
         } else {
@@ -2830,63 +2968,6 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         }
       }
     }, "checkEnd");
-    collides("mover", "land", (mover) => {
-      mover.unuse("mover");
-      mover.sideSpeed = 0;
-      mover.upSpeed = 0;
-      shake(10);
-    });
-    collides("player", "land", (player2, land) => {
-      if (launchState !== "landed") {
-        launchState = "landed";
-        slowMo = false;
-        throwArrow.destroy();
-        checkEnd();
-      }
-    });
-    collides("blade", "enemy", (blade, enemy) => {
-      const wasPreviouslyDisabled = enemy.disabled;
-      blade.speed = 0;
-      enemy.disabled = true;
-      enemy.color = COLORS.GREY;
-      ammoRecovered++;
-      shake(5);
-      !wasPreviouslyDisabled && checkEnd();
-    });
-    collides("blade", "flier", (blade, flier) => {
-      flier.use("mover");
-      blade.use(follow(flier, blade.pos.sub(flier.pos)));
-      const direction2 = dir(blade.throwAngle).scale(4);
-      console.log({ angle: blade.throwAngle, direction: direction2 });
-      flier.sideSpeed = direction2.x;
-      flier.upSpeed = -direction2.y;
-    });
-    collides("blade", "land", (blade) => {
-      blade.speed = 0;
-      ammoRecovered++;
-      misses++;
-      checkEnd();
-    });
-    collides("player", "flier", (player2, flier) => {
-      if (!flier.disabled) {
-        shake(10);
-        player2.sideSpeed = 0;
-      }
-    });
-    collides("player", "kickable", (player2, kickable) => {
-      if (kickable.disabled === false) {
-        isKicking = true;
-        slowMo = true;
-        kickable.disabled = true;
-        kickable.color = COLORS.GREY;
-        shake(10);
-        wait(1, () => {
-          kickable.kickDirection = player2.pos.sub(kickable.pos).x;
-          slowMo = false;
-          isKicking = false;
-        });
-      }
-    });
     action("blade", (blade) => {
       blade.move(dir(blade.throwAngle).scale(blade.speed * speedModifier()));
       if (blade.pos.y >= height() || blade.pos.x >= width() || blade.pos.y < 0 || blade.pos.x < 0) {
@@ -2902,73 +2983,42 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     });
     let direction = 1;
     action("launchArrow", (launchArrow2) => {
-      if (launchState === "prelaunch") {
+      const player = get("player")[0];
+      if (player.state === "prelaunch") {
         if (launchArrow2.angle <= LAUNCH_ARROW_MIN_ANGLE) {
           direction = 1;
         } else if (launchArrow2.angle >= LAUNCH_ARROW_MAX_ANGLE) {
           direction = -1;
         }
         launchArrow2.angle = launchArrow2.angle + direction * LAUNCH_ARROW_SPEED;
-      } else if (launchState === "launching") {
+      } else if (player.state === "launching") {
         if (launchArrow2.scale.x <= LAUNCH_ARROW_MAX_STRENGTH) {
           launchArrow2.scale = launchArrow2.scale.add(LAUNCH_ARROW_STRENGHT_SPEED, LAUNCH_ARROW_STRENGHT_SPEED);
         }
-      } else if (launchState === "launched") {
+      } else if (player.state === "launched") {
         launchArrow2.destroy();
       }
     });
-    action("throwArrow", (throwArrow2) => {
-      if (slowMo) {
-        throwArrow2.angle += THROW_ARROW_SPEED;
-        if (throwArrow2.angle === 360) {
-          slowMo = false;
-          launchState = "afterThrow";
-          throwArrow2.destroy();
+    action("throwArrow", (throwArrow) => {
+      const player = get("player")[0];
+      if (state_default.level.isSlowMo) {
+        throwArrow.angle += THROW_ARROW_SPEED;
+        if (throwArrow.angle === 360) {
+          state_default.level.isSlowMo = false;
+          player.state = "afterThrow";
+          player.isThrowing = false;
+          throwArrow.destroy();
         }
       }
     });
     action("mover", (mover) => {
       mover.moveBy(mover.sideSpeed * speedModifier(), -mover.upSpeed * speedModifier());
-      if (!slowMo) {
+      if (!state_default.level.isSlowMo) {
         mover.upSpeed -= gravity;
       }
     });
-    action("player", (player2) => {
-      if (player2.pos.x > width() + 2 * UNITS || player2.pos.y > height() + 2 * UNITS) {
-        attemptReset();
-      }
-      const curAnim = player2.curAnim();
-      if (isKicking) {
-        player2.play("kicking", { loop: true });
-      } else if (launchState === "prelaunch" && curAnim !== "idle") {
-        player2.play("idle", { loop: true, speed: 4 });
-      } else if (launchState === "launching" && curAnim !== "crouch") {
-        player2.play("crouch", { loop: true, speed: 4 });
-      } else if (launchState === "launched" || launchState === "afterThrow") {
-        if (slowMo) {
-          if (curAnim === "somersault") {
-            player2.play("throwing", { loop: true });
-          }
-          player2.angle = throwArrow.angle;
-        } else {
-          if (curAnim === "crouch") {
-            player2.play("startJump", { speed: 10 });
-          } else if (curAnim !== "somersault" && (curAnim !== "startJump" || player2.frame >= START_JUMP_END_FRAME)) {
-            player2.play("somersault", { loop: true });
-            player2.flipX(false);
-            player2.angle = 0;
-          }
-        }
-      } else if (launchState === "landed" && player2.frame !== LANDING_END_FRAME) {
-        if (!curAnim || curAnim === "somersault" || curAnim === "throwing" || curAnim === "kicking") {
-          player2.play("landing", { speed: 2 });
-          player2.flipX(false);
-          player2.angle = 0;
-        }
-      } else if (curAnim !== "idle" && (get("enemy").length === 0 || levelWin === true)) {
-        player2.play("idle", { loop: true, speed: 4 });
-      }
-    });
+    registerPlayerActions({ attemptReset });
+    registerCollisions({ checkEnd });
   });
 
   // code/scenes/title.js

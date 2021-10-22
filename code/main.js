@@ -1,5 +1,6 @@
 import k from "./kaboom";
 import "./scenes/index.js"; // initializes all scenes
+import "./game.constants";
 
 
 export const START_JUMP_END_FRAME = 49;
