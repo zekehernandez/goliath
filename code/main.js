@@ -2,13 +2,24 @@ import k from "./kaboom";
 import "./scenes/index.js"; // initializes all scenes
 import "./game.constants";
 
-
 export const START_JUMP_END_FRAME = 49;
 export const LANDING_END_FRAME = 59;
+export const FALLING_END_FRAME = 77;
+export const BUILDING_COUNT = 3;
+
+const SPRITE_SIZE = 96;
+
+const loadBuilding = (id) => {
+  k.loadSprite(`building${id}`, `sprites/building${id}_atlas.png`, {
+    sliceX: 2,
+    sliceY: 4,
+  });
+};
 
 // load assets
 k.loadSprite("bean", "sprites/bean.png");
 k.loadSprite("arrow", "sprites/arrow.png");
+k.loadSprite("background", "sprites/background.png");
 k.loadSpriteAtlas("sprites/player_atlas.png", {
   "player": {
     x: 0,
@@ -24,10 +35,14 @@ k.loadSpriteAtlas("sprites/player_atlas.png", {
       somersault: { from: 50, to: 55   },
       landing: { from: 58, to: LANDING_END_FRAME },
       throwing: { from: 60, to: 60 },
-      falling: { from: 75, to: 77 },
+      falling: { from: 75, to: FALLING_END_FRAME },
       kicking: { from: 90, to: 90 },
     },
   },
 });
+
+for (let i = 0; i < BUILDING_COUNT; i++) {
+  loadBuilding(i);
+} 
 
 k.go("game");

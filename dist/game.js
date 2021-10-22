@@ -2371,16 +2371,23 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
   var UNITS = 48;
 
   // code/kaboom.js
-  var k = kaboom_default({ width: 32 * UNITS, height: 18 * UNITS, font: "sink" });
+  var k = kaboom_default({ width: 32 * UNITS, height: 18 * UNITS, font: "apl386", letterbox: true, stretch: true });
   var kaboom_default2 = k;
 
   // code/game.constants.js
+  var isDebugging = false;
   var COLORS = {
+    WHITE: rgb(255, 255, 255),
     BLACK: rgb(0, 0, 0),
     GREY: rgb(180, 180, 160),
     RED: rgb(240, 50, 50),
-    GREEN: rgb(60, 230, 110)
+    GREEN: rgb(60, 230, 110),
+    PURPLE: rgb(200, 100, 200)
   };
+  var getColliderComps = /* @__PURE__ */ __name((colliderColor) => [
+    color(colliderColor),
+    opacity(isDebugging ? 0.5 : 0)
+  ], "getColliderComps");
 
   // code/levels.js
   var levels_default = [
@@ -2392,17 +2399,17 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       "                                ",
       "                                ",
       "                                ",
-      "            o                   ",
+      "              o                 ",
       "                                ",
       "                                ",
       "                                ",
       "                                ",
       "                                ",
       " @                              ",
-      "++                     x        ",
-      "++   ========================== ",
-      "++   ========================== ",
-      "++   ========================== "
+      "__                     x        ",
+      "AB    0TTTTTTTTTTTTTTTTTTTTTTT  ",
+      "CD    123232323232323232323232  ",
+      "EF    456565656565656565656565  "
     ],
     [
       "                                ",
@@ -2413,16 +2420,16 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       "                                ",
       "                                ",
       " @                              ",
-      "++                              ",
-      "++                              ",
-      "++                              ",
-      "++                      x       ",
-      "++              ==========      ",
-      "++              ==========      ",
-      "++      ==================      ",
-      "++      ==================      ",
-      "++      ==================      ",
-      "++      ==================      "
+      "__                              ",
+      "AB                              ",
+      "CD                              ",
+      "EF                      x       ",
+      "AB              0TTTTTTTTT      ",
+      "CD              1232323232      ",
+      "EF              6565656565      ",
+      "AB      0TTTTTTT9898989898      ",
+      "CD      123232323232323232      ",
+      "EF      456565656565656565      "
     ],
     [
       "                                ",
@@ -2439,10 +2446,10 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       "                                ",
       "                                ",
       "               x                ",
-      "              ============      ",
-      "              ============      ",
-      " @            ============      ",
-      "++            ============      "
+      "              |===========      ",
+      "              |===========      ",
+      " @            |===========      ",
+      "++            |===========      "
     ],
     [
       "                                ",
@@ -2460,11 +2467,11 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       "++                              ",
       "++                              ",
       "++           x         x        ",
-      "++   =======================.   ",
-      "++   =======================.   ",
-      "++   =======================.   ",
-      "++   =======================.   ",
-      "++   =======================.   "
+      "++   |======================    ",
+      "++   |======================    ",
+      "++   |======================    ",
+      "++   |======================    ",
+      "++   |======================    "
     ]
   ];
 
@@ -2473,6 +2480,14 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     sideSpeed: 0,
     upSpeed: 0
   };
+  var kickableProps = {
+    kickDirection: 0
+  };
+  var tileComps = [
+    area(),
+    solid(),
+    scale(0.5)
+  ];
 
   // code/state.js
   var defaultLevel = {
@@ -2482,7 +2497,8 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     misses: 0
   };
   var state = {
-    level: __spreadValues({}, defaultLevel)
+    level: __spreadValues({}, defaultLevel),
+    currentBuilding: -1
   };
   var resetLevelState = /* @__PURE__ */ __name(() => {
     state.level = __spreadValues({}, defaultLevel);
@@ -2500,12 +2516,34 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     __spreadProps(__spreadValues({}, moverProps), {
       state: "prelaunch",
       isKicking: false,
-      isThrowing: false
+      isThrowing: false,
+      isFalling: false
     })
   ];
   var createPlayer = /* @__PURE__ */ __name((otherProps = []) => {
     return [...playerComps, ...otherProps];
   }, "createPlayer");
+  var destroyPlayer = /* @__PURE__ */ __name(() => {
+    destroyAll("player");
+    destroyAll("playerLandCollider");
+  }, "destroyPlayer");
+  var addPlayerColliders = /* @__PURE__ */ __name(() => {
+    const player = get("player")[0];
+    add([
+      "playerLandCollider",
+      "landCollider",
+      layer("ui"),
+      rect(0.5 * UNITS, 0.5 * UNITS),
+      ...getColliderComps(COLORS.PURPLE),
+      pos(-2 * UNITS, -2 * UNITS),
+      origin("bot"),
+      follow(player, vec2(0, 1 * UNITS)),
+      area(),
+      {
+        owner: player
+      }
+    ]);
+  }, "addPlayerColliders");
   var registerPlayerActions = /* @__PURE__ */ __name(({ attemptReset }) => {
     action("player", (player) => {
       if (player.pos.x > width() + 2 * UNITS || player.pos.y > height() + 2 * UNITS) {
@@ -2554,20 +2592,28 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         blade.isRecovered = true;
       }
     }, "attemptAmmoRecover");
-    collides("mover", "land", (mover) => {
-      mover.unuse("mover");
-      mover.sideSpeed = 0;
-      mover.upSpeed = 0;
+    collides("landCollider", "land", (collider) => {
+      collider.owner.unuse("mover");
+      collider.owner.sideSpeed = 0;
+      collider.owner.upSpeed = 0;
       shake(10);
     });
-    collides("player", "land", (player, land) => {
-      if (player.state !== "landed") {
+    collides("playerLandCollider", "land", () => {
+      const player = get("player")[0];
+      if (player.state !== "landed" && !player.isFalling) {
         player.state = "landed";
         player.isKicking = false;
         player.isThrowing = false;
         state_default.level.isSlowMo = false;
         destroyAll("throwArrow");
         checkEnd();
+      }
+    });
+    collides("playerLandCollider", "wallCollider", () => {
+      const player = get("player")[0];
+      if (player.state !== "landed") {
+        player.sideSpeed = 0;
+        player.isFalling = true;
       }
     });
     collides("blade", "enemy", (blade, enemy) => {
@@ -2617,11 +2663,66 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     });
   }, "registerCollisions");
 
+  // code/loadLevel.js
+  var loadLevel = /* @__PURE__ */ __name((level, launchId, landId) => {
+    addLevel(level, {
+      width: 48,
+      height: 48,
+      "@": () => createPlayer(),
+      "_": () => [...tileComps, "launch", sprite(`building${launchId}`, { frame: 0 })],
+      "A": () => [...tileComps, "launch", sprite(`building${launchId}`, { frame: 2 })],
+      "B": () => [...tileComps, "launch", sprite(`building${launchId}`, { frame: 3 })],
+      "C": () => [...tileComps, "launch", sprite(`building${launchId}`, { frame: 4 })],
+      "D": () => [...tileComps, "launch", sprite(`building${launchId}`, { frame: 5 })],
+      "E": () => [...tileComps, "launch", sprite(`building${launchId}`, { frame: 6 })],
+      "F": () => [...tileComps, "launch", sprite(`building${launchId}`, { frame: 7 })],
+      "T": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 0 })],
+      "0": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 0 }), "wall"],
+      "1": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 2 }), "wall"],
+      "2": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 3 })],
+      "3": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 2 })],
+      "4": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 4 }), "wall"],
+      "5": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 5 })],
+      "6": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 4 })],
+      "7": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 6 }), "wall"],
+      "8": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 7 })],
+      "9": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 6 })],
+      "x": () => [
+        "enemy",
+        "kickable",
+        rect(1 * UNITS, 2 * UNITS),
+        area(),
+        body(),
+        color(COLORS.GREEN),
+        origin("left"),
+        outline(),
+        __spreadValues({
+          disabled: false
+        }, kickableProps)
+      ],
+      "o": () => [
+        "enemy",
+        "flier",
+        rect(1 * UNITS, 1 * UNITS),
+        area(),
+        solid(),
+        color(COLORS.GREEN),
+        origin("left"),
+        outline(),
+        __spreadValues({
+          disabled: false
+        }, moverProps)
+      ]
+    });
+  }, "loadLevel");
+  var loadLevel_default = loadLevel;
+
   // code/scenes/game.js
   var GRAVITY = 0.2;
   var SLOW_MO_MODIFIER = 0.045;
   var STARTING_AMMO_COUNT = 3;
   var STARTING_SMOKE_BOMB_COUNT = 3;
+  var WALL_COLLIDER_THICKNESS = 16;
   var LAUNCH_ARROW_SPEED = 0.75;
   var LAUNCH_ARROW_MIN_ANGLE = 0;
   var LAUNCH_ARROW_MAX_ANGLE = 90;
@@ -2631,9 +2732,6 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
   var THROW_ARROW_SPEED = 2;
   var BLADE_SPEED = 1e3;
   var BLADE_START_DISTANCE = 50;
-  var kickableProps = {
-    kickDirection: 0
-  };
   var launchArrowComps = [
     "launchArrow",
     sprite("arrow"),
@@ -2653,6 +2751,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     opacity(0)
   ];
   kaboom_default2.scene("game", (args = {}) => {
+    resetLevelState();
     let currentLevel;
     let ammoCount = STARTING_AMMO_COUNT;
     let smokeBombCount = STARTING_SMOKE_BOMB_COUNT;
@@ -2673,20 +2772,22 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     ], "game");
     const startLevel = /* @__PURE__ */ __name((newLevel) => {
       kaboom_default2.every((obj) => obj.destroy());
+      state_default.currentBuilding = (state_default.currentBuilding + 1) % 3;
+      const nextBuilding = (state_default.currentBuilding + 1) % 3;
       ammoCount += state_default.level.ammoRecovered;
       ammoCounter = add([
         "ammoCounter",
-        text(getAmmoCounterText(), { font: "sink", size: 24 }),
+        text(getAmmoCounterText(), { size: 24 }),
         pos(1 * UNITS, 1 * UNITS),
         layer("ui"),
-        color(ammoCount > 0 ? COLORS.BLACK : COLORS.RED)
+        color(ammoCount > 0 ? COLORS.WHITE : COLORS.RED)
       ]);
       smokeBombCounter = add([
         "smokeBombsCounter",
-        text(getSmokeBombCounterText(), { font: "sink", size: 24 }),
+        text(getSmokeBombCounterText(), { size: 24 }),
         pos(1 * UNITS, 2 * UNITS),
         layer("ui"),
-        color(smokeBombCount > 0 ? COLORS.BLACK : COLORS.RED)
+        color(smokeBombCount > 0 ? COLORS.WHITE : COLORS.RED)
       ]);
       currentLevel = newLevel;
       resetLevelState();
@@ -2695,85 +2796,66 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       misses = 0;
       add([
         "sky",
-        rect(width(), height()),
-        color(220, 240, 255),
+        sprite("background"),
+        scale(0.5),
         layer("bg")
       ]);
       overlay = add([
         rect(width(), height()),
         color(0, 0, 0),
-        opacity(0),
+        opacity(0.5),
         layer("bg")
       ]);
       overlay.action(() => {
         if (state_default.level.isSlowMo) {
-          overlay.opacity = wave(0, 0.25, 1e3);
+          overlay.opacity = wave(0.5, 0.75, 1e3);
         } else {
-          overlay.color = rgb(0, 0, 0);
-          overlay.opacity = 0;
+          overlay.opacity = 0.5;
         }
       });
-      addLevel(levels_default[currentLevel], {
-        width: 48,
-        height: 48,
-        "@": () => createPlayer(),
-        "+": () => [
-          "launch",
-          rect(1 * UNITS, 1 * UNITS),
-          area(),
-          solid(),
-          outline(),
-          color(127, 200, 255)
-        ],
-        "=": () => [
-          "land",
-          rect(1 * UNITS, 1 * UNITS),
-          area(),
-          solid(),
-          outline(),
-          color(127, 255, 255)
-        ],
-        "x": () => [
-          "enemy",
-          "kickable",
-          rect(1 * UNITS, 2 * UNITS),
-          area(),
-          body(),
-          color(COLORS.GREEN),
-          origin("left"),
-          outline(),
-          __spreadValues({
-            disabled: false
-          }, kickableProps)
-        ],
-        "o": () => [
-          "enemy",
-          "flier",
-          rect(1 * UNITS, 1 * UNITS),
-          area(),
-          solid(),
-          color(COLORS.GREEN),
-          origin("left"),
-          outline(),
-          __spreadValues({
-            disabled: false
-          }, moverProps)
-        ]
-      });
+      loadLevel_default(levels_default[currentLevel], state_default.currentBuilding, nextBuilding);
       const player = get("player")[0];
+      addPlayerColliders(player);
       player.play("landing");
       startingPosition = __spreadValues({}, player.pos);
+      every("wall", (wall) => {
+        add([
+          layer("ui"),
+          "wallCollider",
+          rect(WALL_COLLIDER_THICKNESS, 1 * UNITS),
+          ...getColliderComps(COLORS.PURPLE),
+          pos(wall.pos.add(-WALL_COLLIDER_THICKNESS, 0)),
+          origin("topleft"),
+          area()
+        ]);
+      });
+      every("flier", (flier) => {
+        add([
+          layer("ui"),
+          "landCollider",
+          rect(1 * UNITS, 0.5 * UNITS),
+          ...getColliderComps(COLORS.PURPLE),
+          pos(flier.pos.add(0, 0.5 * UNITS)),
+          follow(flier, vec2(0, 0.5 * UNITS)),
+          origin("botleft"),
+          area(),
+          {
+            owner: flier
+          }
+        ]);
+      });
       launchArrow = add([...launchArrowComps, pos(player.pos)]);
       add([...throwArrowComps, follow(player)]);
     }, "startLevel");
     startLevel(0);
     const reset = /* @__PURE__ */ __name(() => {
       useSmokeBomb();
-      destroyAll("player");
+      destroyPlayer();
       destroyAll("throwArrow");
       launchArrow.destroy();
       state_default.level.isSlowMo = false;
       let player = add(createPlayer([pos(startingPosition)]));
+      addPlayerColliders();
       player.play("landing");
       launchArrow = add([...launchArrowComps, pos(startingPosition)]);
       add([...throwArrowComps, follow(player)]);
@@ -2817,6 +2899,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         rect(10, 10),
         area(),
         pos(bladePos),
+        z(1),
         __spreadValues({
           speed: BLADE_SPEED,
           throwAngle: throwArrow.angle - 90,
@@ -2978,7 +3061,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     });
     action("kickable", (kickable) => {
       if (kickable.kickDirection !== 0) {
-        kickable.moveBy(kickable.kickDirection < 0 ? 40 : -40, 0);
+        kickable.moveBy(kickable.kickDirection < 0 ? 40 : 0, 0);
       }
     });
     let direction = 1;
@@ -3114,8 +3197,17 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
   // code/main.js
   var START_JUMP_END_FRAME = 49;
   var LANDING_END_FRAME = 59;
+  var FALLING_END_FRAME = 77;
+  var BUILDING_COUNT = 3;
+  var loadBuilding = /* @__PURE__ */ __name((id) => {
+    kaboom_default2.loadSprite(`building${id}`, `sprites/building${id}_atlas.png`, {
+      sliceX: 2,
+      sliceY: 4
+    });
+  }, "loadBuilding");
   kaboom_default2.loadSprite("bean", "sprites/bean.png");
   kaboom_default2.loadSprite("arrow", "sprites/arrow.png");
+  kaboom_default2.loadSprite("background", "sprites/background.png");
   kaboom_default2.loadSpriteAtlas("sprites/player_atlas.png", {
     "player": {
       x: 0,
@@ -3131,11 +3223,14 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         somersault: { from: 50, to: 55 },
         landing: { from: 58, to: LANDING_END_FRAME },
         throwing: { from: 60, to: 60 },
-        falling: { from: 75, to: 77 },
+        falling: { from: 75, to: FALLING_END_FRAME },
         kicking: { from: 90, to: 90 }
       }
     }
   });
+  for (let i = 0; i < BUILDING_COUNT; i++) {
+    loadBuilding(i);
+  }
   kaboom_default2.go("game");
 })();
 //# sourceMappingURL=game.js.map

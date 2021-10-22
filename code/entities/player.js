@@ -2,7 +2,8 @@ import k from "../kaboom";
 import { moverProps } from './';
 import state from '../state';
 import { UNITS } from '../constants';
-import { START_JUMP_END_FRAME, LANDING_END_FRAME } from '../main';
+import { COLORS, getColliderComps } from '../game.constants';
+import { START_JUMP_END_FRAME, LANDING_END_FRAME, FALLING_END_FRAME } from '../main';
 
 const playerComps = [
   "player",
@@ -16,13 +17,37 @@ const playerComps = [
       state: 'prelaunch',
       isKicking: false,
       isThrowing: false,
+      isFalling: false,
     },
 ];
 
 
 export const createPlayer = (otherProps = []) => {
   return [...playerComps, ...otherProps];
-}
+};
+
+export const destroyPlayer = () => {
+  destroyAll("player");
+  destroyAll("playerLandCollider");
+};
+
+export const addPlayerColliders = () => {
+  const player = get("player")[0];
+  add([
+    "playerLandCollider",
+    "landCollider",
+    layer('ui'),
+    rect(0.5*UNITS, 0.5*UNITS),
+    ...getColliderComps(COLORS.PURPLE),
+    pos(-2*UNITS, -2*UNITS),
+    origin("bot"),
+    follow(player, vec2(0, 1*UNITS)),
+    area(),
+    {
+      owner: player,
+    }
+  ])
+};
 
 export const registerPlayerActions = ({ attemptReset }) => {
   // player movement

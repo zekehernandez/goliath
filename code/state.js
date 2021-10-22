@@ -8,7 +8,8 @@ const defaultLevel = {
 const state = {
   level: {
     ...defaultLevel,
-  }
+  },
+  currentBuilding: -1,
 };
 
 export const resetLevelState = () => {

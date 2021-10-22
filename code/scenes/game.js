@@ -1,18 +1,21 @@
 import k from "../kaboom";
 import { UNITS } from '../constants';
-import { COLORS } from '../game.constants';
-import { START_JUMP_END_FRAME, LANDING_END_FRAME } from '../main';
+import { COLORS, getColliderComps } from '../game.constants';
+import { BUILDING_COUNT, START_JUMP_END_FRAME, LANDING_END_FRAME } from '../main';
 import levels from '../levels';
-import { createPlayer, registerPlayerActions } from '../entities/player';
-import { moverProps } from '../entities';
+import { createPlayer, destroyPlayer, addPlayerColliders, registerPlayerActions } from '../entities/player';
+import { moverProps, kickableProps } from '../entities';
 import { registerCollisions } from '../events/collisions';
 import state, { resetLevelState } from '../state';
+import loadLevel from '../loadLevel';
 
 // general game consts
 const GRAVITY = 0.2;
 const SLOW_MO_MODIFIER = 0.045;
 const STARTING_AMMO_COUNT = 3;
 const STARTING_SMOKE_BOMB_COUNT = 3;
+
+const WALL_COLLIDER_THICKNESS = 16;
 
 // launch arrow consts
 const LAUNCH_ARROW_SPEED = 0.75;
@@ -28,10 +31,6 @@ const THROW_ARROW_SPEED = 2;
 // blade
 const BLADE_SPEED = 1000;
 const BLADE_START_DISTANCE = 50;
-
-const kickableProps = {
-  kickDirection: 0,
-};
 
 const launchArrowComps = [
   "launchArrow",
@@ -54,6 +53,8 @@ const throwArrowComps = [
 ];
 
 k.scene("game", (args = {}) => {
+  resetLevelState();
+
   // game state
   let currentLevel;
   let ammoCount = STARTING_AMMO_COUNT;
@@ -85,22 +86,25 @@ k.scene("game", (args = {}) => {
     // destroy any existing game objects
     k.every((obj) => obj.destroy());
 
+    state.currentBuilding = (state.currentBuilding + 1) % 3;
+    const nextBuilding = (state.currentBuilding + 1) % 3;
+
     ammoCount += state.level.ammoRecovered;
 
     ammoCounter = add([
       "ammoCounter",
-      text(getAmmoCounterText(), { font: 'sink', size: 24 }),
+      text(getAmmoCounterText(), { size: 24 }),
       pos(1*UNITS, 1*UNITS),
       layer('ui'),
-      color(ammoCount > 0 ? COLORS.BLACK : COLORS.RED),
+      color(ammoCount > 0 ? COLORS.WHITE : COLORS.RED),
     ]);
 
     smokeBombCounter = add([
       "smokeBombsCounter",
-      text(getSmokeBombCounterText(), { font: 'sink', size: 24 }),
+      text(getSmokeBombCounterText(), { size: 24 }),
       pos(1*UNITS, 2*UNITS),
       layer('ui'),
-      color(smokeBombCount > 0 ? COLORS.BLACK : COLORS.RED),
+      color(smokeBombCount > 0 ? COLORS.WHITE : COLORS.RED),
     ]);
 
     currentLevel = newLevel;
@@ -111,82 +115,60 @@ k.scene("game", (args = {}) => {
 
     add([
       "sky",
-      rect(width(), height()),
-      color(220, 240, 255),
+      sprite("background"),
+      scale(0.5),
       layer("bg"),
     ]);
 
     overlay = add([
       rect(width(), height()),
       color(0, 0, 0),
-      opacity(0),
-    layer("bg"),
+      opacity(0.5),
+      layer("bg"),
     ]);
 
     overlay.action(() => {
       if (state.level.isSlowMo) {
-        overlay.opacity = wave(0, 0.25, 1000);
+        overlay.opacity = wave(0.5, 0.75, 1000);
       } else {
-        overlay.color = rgb(0, 0, 0);
-        overlay.opacity = 0;
+        overlay.opacity = 0.5;
       }
     });
 
-    addLevel(levels[currentLevel], {
-      // define the size of each block
-      width: 48,
-      height: 48,
-      // define what each symbol means, by a function returning a comp list (what you'll pass to add())
-      "@": () => createPlayer(),
-      "+": () => [
-        "launch",
-        rect(1*UNITS, 1*UNITS),
-        area(),
-        solid(),
-        outline(),
-        color(127, 200, 255),
-      ],
-      "=": () => [
-        "land",
-        rect(1*UNITS, 1*UNITS),
-        area(),
-        solid(),
-        outline(),
-        color(127, 255, 255),
-      ],
-      "x": () => [
-        "enemy",
-        "kickable",
-        rect(1*UNITS, 2*UNITS),
-        area(),
-        body(),
-        color(COLORS.GREEN),
-        origin("left"),
-        outline(),
-        {
-          disabled: false,
-          ...kickableProps,
-        },
-      ],
-      "o": () => [
-        "enemy",
-        "flier",
-        rect(1*UNITS, 1*UNITS),
-        area(),
-        solid(),
-        color(COLORS.GREEN),
-        origin("left"),
-        outline(),
-        {
-          disabled: false,
-          ...moverProps,
-        },
-      ],
-    });
+    loadLevel(levels[currentLevel], state.currentBuilding, nextBuilding);
 
     const player = get("player")[0];
+    addPlayerColliders(player);
     player.play("landing");
     startingPosition = {...player.pos};
+
+    every("wall", wall => {
+      add([
+        layer('ui'),
+        "wallCollider",
+        rect(WALL_COLLIDER_THICKNESS, 1*UNITS),
+        ...getColliderComps(COLORS.PURPLE),
+        pos(wall.pos.add(-WALL_COLLIDER_THICKNESS, 0)),
+        origin("topleft"),
+        area(),
+      ]);
+    });
+
+    every("flier", flier => {
+      add([
+        layer('ui'),
+        "landCollider",
+        rect(1*UNITS, 0.5*UNITS),
+        ...getColliderComps(COLORS.PURPLE),
+        pos(flier.pos.add(0, 0.5*UNITS)),
+        follow(flier, vec2(0, 0.5*UNITS)),
+        origin("botleft"),
+        area(),
+        {
+          owner: flier,
+        },
+      ])
+    });
 
     // launch arrow
     launchArrow = add([...launchArrowComps, pos(player.pos)]);
@@ -203,11 +185,12 @@ k.scene("game", (args = {}) => {
 
   const reset = () => {
     useSmokeBomb();
-    destroyAll("player");
+    destroyPlayer();
     destroyAll("throwArrow");
     launchArrow.destroy();
     state.level.isSlowMo = false;
     let player = add(createPlayer([pos(startingPosition)]));
+    addPlayerColliders();
     player.play("landing");
     launchArrow = add([...launchArrowComps, pos(startingPosition)]);
     add([...throwArrowComps, follow(player)]);
@@ -257,6 +240,7 @@ k.scene("game", (args = {}) => {
       rect(10, 10),
       area(),
       pos(bladePos),
+      z(1),
       {
         speed: BLADE_SPEED,
         throwAngle: throwArrow.angle - 90,
@@ -445,7 +429,7 @@ k.scene("game", (args = {}) => {
 
   action("kickable", kickable => {
     if (kickable.kickDirection !== 0) {
-      kickable.moveBy(kickable.kickDirection < 0 ? 40 : -40, 0);
+      kickable.moveBy(kickable.kickDirection < 0 ? 40 : 0, 0);
     }
   });
 

@@ -9,21 +9,30 @@ export const registerCollisions = ({ checkEnd }) => {
     }
   }
 
-  collides("mover", "land", (mover) => {
-      mover.unuse("mover");
-      mover.sideSpeed = 0;
-      mover.upSpeed = 0;
+  collides("landCollider", "land", (collider) => {
+      collider.owner.unuse("mover");
+      collider.owner.sideSpeed = 0;
+      collider.owner.upSpeed = 0;
       shake(10);
   });
 
-  collides("player", "land", (player, land) => {
-    if (player.state !== "landed") {
+  collides("playerLandCollider", "land", () => {
+    const player = get("player")[0];
+    if (player.state !== "landed" && !player.isFalling) {
       player.state = "landed";
       player.isKicking = false;
       player.isThrowing = false;
       state.level.isSlowMo = false;
       destroyAll("throwArrow");
       checkEnd();
+    }
+  });
+
+  collides("playerLandCollider", "wallCollider", () => {
+    const player = get("player")[0];
+    if (player.state !== "landed") {
+      player.sideSpeed = 0;
+      player.isFalling = true;
     }
   });
 
