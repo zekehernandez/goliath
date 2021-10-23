@@ -2371,8 +2371,50 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
   var UNITS = 48;
 
   // code/kaboom.js
-  var k = kaboom_default({ width: 32 * UNITS, height: 18 * UNITS, font: "apl386", letterbox: true, stretch: true });
+  var k = kaboom_default({ width: 32 * UNITS, height: 18 * UNITS, font: "apl386", background: [48, 74, 70], stretch: true, letterbox: true });
   var kaboom_default2 = k;
+
+  // code/loadAssets.js
+  var START_JUMP_END_FRAME = 49;
+  var LANDING_END_FRAME = 59;
+  var FALLING_END_FRAME = 77;
+  var BUILDING_COUNT = 3;
+  var loadAssets = /* @__PURE__ */ __name(() => {
+    const loadBuilding = /* @__PURE__ */ __name((id) => {
+      kaboom_default2.loadSprite(`building${id}`, `sprites/building${id}_atlas.png`, {
+        sliceX: 2,
+        sliceY: 4
+      });
+    }, "loadBuilding");
+    kaboom_default2.loadSprite("bean", "sprites/bean.png");
+    kaboom_default2.loadSprite("arrow", "sprites/arrow.png");
+    kaboom_default2.loadSprite("background", "sprites/background.png");
+    kaboom_default2.loadSprite("title", "sprites/title.png");
+    kaboom_default2.loadSpriteAtlas("sprites/player_atlas.png", {
+      "player": {
+        x: 0,
+        y: 0,
+        width: 720,
+        height: 336,
+        sliceX: 15,
+        sliceY: 7,
+        anims: {
+          idle: { from: 15, to: 21 },
+          crouch: { from: 30, to: 35 },
+          startJump: { from: 47, to: START_JUMP_END_FRAME },
+          somersault: { from: 50, to: 55 },
+          landing: { from: 58, to: LANDING_END_FRAME },
+          throwing: { from: 60, to: 60 },
+          falling: { from: 75, to: FALLING_END_FRAME },
+          kicking: { from: 90, to: 90 }
+        }
+      }
+    });
+    for (let i = 0; i < BUILDING_COUNT; i++) {
+      loadBuilding(i);
+    }
+  }, "loadAssets");
+  var loadAssets_default = loadAssets;
 
   // code/game.constants.js
   var isDebugging = false;
@@ -2426,7 +2468,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       "EF                      x       ",
       "AB              0TTTTTTTTT      ",
       "CD              1232323232      ",
-      "EF              6565656565      ",
+      "EF              4565656565      ",
       "AB      0TTTTTTT9898989898      ",
       "CD      123232323232323232      ",
       "EF      456565656565656565      "
@@ -2446,10 +2488,10 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       "                                ",
       "                                ",
       "               x                ",
-      "              |===========      ",
-      "              |===========      ",
-      " @            |===========      ",
-      "++            |===========      "
+      "              0TTTTTTTTTTT      ",
+      "              123232323232      ",
+      " @            456565656565      ",
+      "__            789898989898      "
     ],
     [
       "                                ",
@@ -2463,15 +2505,15 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       "                                ",
       "                                ",
       " @                              ",
-      "++                              ",
-      "++                              ",
-      "++                              ",
-      "++           x         x        ",
-      "++   |======================    ",
-      "++   |======================    ",
-      "++   |======================    ",
-      "++   |======================    ",
-      "++   |======================    "
+      "__                              ",
+      "AB                              ",
+      "CD                              ",
+      "EF           x         x        ",
+      "AB   0TTTTTTTTTTTTTTTTTTTTTT    ",
+      "CD   12323232323232323232323    ",
+      "EF   45656565656565656565656    ",
+      "AB   78989898989898989898989    ",
+      "CD   12323232323232323232323    "
     ]
   ];
 
@@ -2758,7 +2800,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     let previousMouseDown;
     let misses;
     let launchArrow;
-    let overlay;
+    let overlay2;
     let ammoCounter;
     let smokeBombCounter;
     let startingPosition;
@@ -2800,17 +2842,17 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         scale(0.5),
         layer("bg")
       ]);
-      overlay = add([
+      overlay2 = add([
         rect(width(), height()),
         color(0, 0, 0),
-        opacity(0.5),
+        opacity(0.25),
         layer("bg")
       ]);
-      overlay.action(() => {
+      overlay2.action(() => {
         if (state_default.level.isSlowMo) {
-          overlay.opacity = wave(0.5, 0.75, 1e3);
+          overlay2.opacity = wave(0.25, 0.5, 1e3);
         } else {
-          overlay.opacity = 0.5;
+          overlay2.opacity = 0.25;
         }
       });
       loadLevel_default(levels_default[currentLevel], state_default.currentBuilding, nextBuilding);
@@ -2973,7 +3015,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
           rect(10 * UNITS, 6 * UNITS),
           area(),
           color(40, 40, 60),
-          pos(center().x, 2 * UNITS),
+          pos(16 * UNITS, 2 * UNITS),
           origin("top"),
           layer("ui")
         ]);
@@ -3108,20 +3150,14 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
   kaboom_default2.scene("title", (args = {}) => {
     add([
       "background",
-      rect(width(), height()),
-      color(20, 20, 40)
-    ]);
-    add([
-      "title",
-      text("Throwing Star", { size: 60 }),
-      origin("center"),
-      pos(center().x, center().y - 100)
+      sprite("title"),
+      scale(0.5)
     ]);
     const cta = add([
       "cta",
       text("Click to begin", { size: 30 }),
-      origin("center"),
-      pos(center().x, center().y + 50),
+      pos(31 * UNITS, 17 * UNITS),
+      origin("right"),
       opacity(0)
     ]);
     loop(0.75, () => {
@@ -3131,7 +3167,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         cta.opacity = 0;
       }
     });
-    mouseClick(() => kaboom_default2.go("game"));
+    mouseClick(() => kaboom_default2.go("instructions"));
   });
 
   // code/scenes/win.js
@@ -3194,43 +3230,60 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     mouseClick(() => kaboom_default2.go("game"));
   });
 
-  // code/main.js
-  var START_JUMP_END_FRAME = 49;
-  var LANDING_END_FRAME = 59;
-  var FALLING_END_FRAME = 77;
-  var BUILDING_COUNT = 3;
-  var loadBuilding = /* @__PURE__ */ __name((id) => {
-    kaboom_default2.loadSprite(`building${id}`, `sprites/building${id}_atlas.png`, {
-      sliceX: 2,
-      sliceY: 4
-    });
-  }, "loadBuilding");
-  kaboom_default2.loadSprite("bean", "sprites/bean.png");
-  kaboom_default2.loadSprite("arrow", "sprites/arrow.png");
-  kaboom_default2.loadSprite("background", "sprites/background.png");
-  kaboom_default2.loadSpriteAtlas("sprites/player_atlas.png", {
-    "player": {
-      x: 0,
-      y: 0,
-      width: 720,
-      height: 336,
-      sliceX: 15,
-      sliceY: 7,
-      anims: {
-        idle: { from: 15, to: 21 },
-        crouch: { from: 30, to: 35 },
-        startJump: { from: 47, to: START_JUMP_END_FRAME },
-        somersault: { from: 50, to: 55 },
-        landing: { from: 58, to: LANDING_END_FRAME },
-        throwing: { from: 60, to: 60 },
-        falling: { from: 75, to: FALLING_END_FRAME },
-        kicking: { from: 90, to: 90 }
+  // code/scenes/instructions.js
+  kaboom_default2.scene("instructions", (args = {}) => {
+    add([
+      "background",
+      sprite("background"),
+      scale(0.5)
+    ]);
+    overlay = add([
+      rect(width(), height()),
+      color(0, 0, 0),
+      opacity(0.75),
+      layer("bg")
+    ]);
+    add([
+      text("HOW TO PLAY", { size: 60 }),
+      origin("center"),
+      pos(16 * UNITS, 2 * UNITS)
+    ]);
+    const body2 = "The goal of this (very WIP) game is to elimate threats (green rectangles) on each rooftop. \n\nThis is done by throwing your energy kunai (just white dots) at the targets. \n\nYou have limited ammo, so take your shots carefully!";
+    add([
+      text(body2, { size: 32, width: 20 * UNITS }),
+      origin("top"),
+      pos(16 * UNITS, 3 * UNITS)
+    ]);
+    add([
+      text("Controls", { size: 48 }),
+      origin("center"),
+      pos(16 * UNITS, 10 * UNITS)
+    ]);
+    const controls = "1.) When your Launch Arrow is pointed in the direction you want. Click and hold to start the jump. The longer you hold, the stronger the jump. Release to jump. \n\n2.) While in the air, click to enter slow motion targeting (once per jump). When the Targeting Arrow is pointed towards where you want to throw, click to throw a kunai. \n\n";
+    add([
+      text(controls, { size: 32, width: 20 * UNITS }),
+      origin("top"),
+      pos(16 * UNITS, 11 * UNITS)
+    ]);
+    const cta = add([
+      "cta",
+      text("Click to play", { size: 30 }),
+      pos(31 * UNITS, 17 * UNITS),
+      origin("right"),
+      opacity(0)
+    ]);
+    loop(0.75, () => {
+      if (cta.opacity === 0) {
+        cta.opacity = 1;
+      } else {
+        cta.opacity = 0;
       }
-    }
+    });
+    mouseClick(() => kaboom_default2.go("game"));
   });
-  for (let i = 0; i < BUILDING_COUNT; i++) {
-    loadBuilding(i);
-  }
-  kaboom_default2.go("game");
+
+  // code/main.js
+  loadAssets_default();
+  kaboom_default2.go("title");
 })();
 //# sourceMappingURL=game.js.map

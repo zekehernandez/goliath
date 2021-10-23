@@ -1,7 +1,6 @@
 import k from "../kaboom";
 import { UNITS } from '../constants';
 import { COLORS, getColliderComps } from '../game.constants';
-import { BUILDING_COUNT, START_JUMP_END_FRAME, LANDING_END_FRAME } from '../main';
 import levels from '../levels';
 import { createPlayer, destroyPlayer, addPlayerColliders, registerPlayerActions } from '../entities/player';
 import { moverProps, kickableProps } from '../entities';
@@ -123,15 +122,15 @@ k.scene("game", (args = {}) => {
     overlay = add([
       rect(width(), height()),
       color(0, 0, 0),
-      opacity(0.5),
+      opacity(0.25),
       layer("bg"),
     ]);
 
     overlay.action(() => {
       if (state.level.isSlowMo) {
-        overlay.opacity = wave(0.5, 0.75, 1000);
+        overlay.opacity = wave(0.25, 0.5, 1000);
       } else {
-        overlay.opacity = 0.5;
+        overlay.opacity = 0.25;
       }
     });
 
@@ -327,7 +326,7 @@ k.scene("game", (args = {}) => {
         rect(10*UNITS, 6*UNITS),
         area(),
         color(40, 40, 60),
-        pos(center().x, 2*UNITS),
+        pos(16*UNITS, 2*UNITS),
         origin("top"),
         layer('ui'),
       ]);

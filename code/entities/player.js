@@ -3,7 +3,7 @@ import { moverProps } from './';
 import state from '../state';
 import { UNITS } from '../constants';
 import { COLORS, getColliderComps } from '../game.constants';
-import { START_JUMP_END_FRAME, LANDING_END_FRAME, FALLING_END_FRAME } from '../main';
+import { START_JUMP_END_FRAME, LANDING_END_FRAME, FALLING_END_FRAME } from '../loadAssets';
 
 const playerComps = [
   "player",

@@ -1,24 +1,18 @@
 import k from '../kaboom';
+import { UNITS } from '../constants';
 
 k.scene("title", (args = {}) => {
   add([
     "background",
-    rect(width(), height()),
-    color(20, 20, 40),
+    sprite("title"),
+      scale(0.5),
   ])
-
-  add([
-      "title",
-      text("Throwing Star", { size: 60 }),
-      origin("center"),
-      pos(center().x, center().y - 100),
-  ]);
 
   const cta = add([
     "cta",
     text("Click to begin", { size: 30 }),
-    origin("center"),
-    pos(center().x, center().y + 50),
+    pos(31*UNITS, 17*UNITS),
+    origin("right"),
     opacity(0),
   ]);
 
@@ -30,5 +24,5 @@ k.scene("title", (args = {}) => {
     }
   });
 
-  mouseClick(() => k.go("game"))
+  mouseClick(() => k.go("instructions"))
 });
