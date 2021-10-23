@@ -1,7 +1,7 @@
 import k from "./kaboom";
 import loadAssets from './loadAssets';
 import "./scenes/index.js"; // initializes all scenes
-import "./game.constants";
+import "./utils";
 
 loadAssets();
 

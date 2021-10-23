@@ -1,10 +1,11 @@
 import k from '../kaboom';
+import { COLORS } from '../utils';
 
 k.scene("win", (args = {}) => {
   add([
     "background",
     rect(width(), height()),
-    color(20, 20, 40),
+    color(COLORS.BLACK),
   ])
 
   add([

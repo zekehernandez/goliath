@@ -1,7 +1,7 @@
-import state from '../state';
-import { COLORS } from '../game.constants';
+ import state from '../state';
+import { COLORS, flash, shakeEntity } from '../utils';
 
-export const registerCollisions = ({ checkEnd }) => {
+export const registerCollisions = ({ endThrow, checkEnd }) => {
   const attemptAmmoRecover = (blade) => {
     if (!blade.isRecovered) {
       state.level.ammoRecovered++;
@@ -21,9 +21,7 @@ export const registerCollisions = ({ checkEnd }) => {
     if (player.state !== "landed" && !player.isFalling) {
       player.state = "landed";
       player.isKicking = false;
-      player.isThrowing = false;
-      state.level.isSlowMo = false;
-      destroyAll("throwArrow");
+      endThrow(player);
       checkEnd();
     }
   });

@@ -2390,6 +2390,45 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     kaboom_default2.loadSprite("arrow", "sprites/arrow.png");
     kaboom_default2.loadSprite("background", "sprites/background.png");
     kaboom_default2.loadSprite("title", "sprites/title.png");
+    kaboom_default2.loadSprite("bossHead", "sprites/goliath_head.png");
+    kaboom_default2.loadSprite("bossBody", "sprites/goliath_body.png");
+    kaboom_default2.loadSprite("bossHand", "sprites/goliath_hand.png");
+    kaboom_default2.loadSprite("bossElbow", "sprites/goliath_elbow.png");
+    kaboom_default2.loadSprite("bossLaser", "sprites/goliath_laser.png", {
+      sliceX: 2,
+      sliceY: 1,
+      anims: {
+        main: {
+          from: 0,
+          to: 1
+        }
+      }
+    });
+    kaboom_default2.loadSprite("bossBlast", "sprites/goliath_blast.png", {
+      sliceX: 3,
+      sliceY: 1,
+      anims: {
+        main: {
+          from: 0,
+          to: 2
+        }
+      }
+    });
+    kaboom_default2.loadSpriteAtlas("sprites/goliath_eye_atlas.png", {
+      "bossEye": {
+        x: 0,
+        y: 0,
+        width: 576,
+        height: 576,
+        sliceX: 3,
+        sliceY: 3,
+        anims: {
+          idle: { from: 0, to: 0 },
+          charging: { from: 3, to: 5 },
+          shooting: { from: 6, to: 8 }
+        }
+      }
+    });
     kaboom_default2.loadSpriteAtlas("sprites/player_atlas.png", {
       "player": {
         x: 0,
@@ -2416,12 +2455,13 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
   }, "loadAssets");
   var loadAssets_default = loadAssets;
 
-  // code/game.constants.js
+  // code/utils.js
   var isDebugging = false;
   var COLORS = {
-    WHITE: rgb(255, 255, 255),
-    BLACK: rgb(0, 0, 0),
+    WHITE: rgb(194, 225, 223),
+    BLACK: rgb(32, 38, 37),
     GREY: rgb(180, 180, 160),
+    DARK_GREY: rgb(65, 75, 74),
     RED: rgb(240, 50, 50),
     GREEN: rgb(60, 230, 110),
     PURPLE: rgb(200, 100, 200)
@@ -2430,6 +2470,20 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     color(colliderColor),
     opacity(isDebugging ? 0.5 : 0)
   ], "getColliderComps");
+  var flash = /* @__PURE__ */ __name((entity, color2 = COLORS.WHITE) => {
+    entity.color = color2;
+    wait(0.2, () => {
+      entity.color = void 0;
+    });
+  }, "flash");
+  var shakeEntity = /* @__PURE__ */ __name((entity) => {
+    entity.shakeTop = entity.pos.y - 0.25 * UNITS;
+    entity.shakeBottom = entity.pos.y;
+    entity.use("shake");
+    wait(0.25, () => {
+      entity.unuse("shake");
+    });
+  }, "shakeEntity");
 
   // code/levels.js
   var levels_default = [
@@ -2514,6 +2568,26 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       "EF   45656565656565656565656    ",
       "AB   78989898989898989898989    ",
       "CD   12323232323232323232323    "
+    ],
+    [
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                 ?              ",
+      "            ?                   ",
+      "         ?            ?         ",
+      "                 ?              ",
+      "            ?         ?         ",
+      "                                ",
+      "         ?      !   ?           ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                @               ",
+      "    0TTTTTTTTTTTTTTTTTTTTTTT    ",
+      "    123232323232323232323232    ",
+      "    456565656565656565656565    "
     ]
   ];
 
@@ -2528,23 +2602,34 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
   var tileComps = [
     area(),
     solid(),
-    scale(0.5)
+    scale(0.5),
+    z(4)
   ];
+  var shakeableProps = {
+    shakeTop: 0,
+    shakeBottom: 0,
+    direction: -1
+  };
 
   // code/state.js
   var defaultLevel = {
     isWon: false,
     isSlowMo: false,
     ammoRecovered: 0,
-    misses: 0
+    misses: 0,
+    isBossBattle: false,
+    isRecovering: false
   };
   var state = {
     level: __spreadValues({}, defaultLevel),
+    health: 3,
     currentBuilding: -1
   };
   var resetLevelState = /* @__PURE__ */ __name(() => {
     state.level = __spreadValues({}, defaultLevel);
   }, "resetLevelState");
+  var SLOW_MO_MODIFIER = 0.045;
+  var speedModifier = /* @__PURE__ */ __name(() => state.level.isSlowMo ? SLOW_MO_MODIFIER : 1, "speedModifier");
   var state_default = state;
 
   // code/entities/player.js
@@ -2552,7 +2637,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     "player",
     sprite("player"),
     scale(2, 2),
-    z(1),
+    z(5),
     area(),
     origin("center"),
     __spreadProps(__spreadValues({}, moverProps), {
@@ -2588,12 +2673,15 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
   }, "addPlayerColliders");
   var registerPlayerActions = /* @__PURE__ */ __name(({ attemptReset }) => {
     action("player", (player) => {
+      console.log(`state: ${player.state}, isThrowing: ${player.isThrowing}, isRecovering: ${state_default.level.isRecovering}`);
       if (player.pos.x > width() + 2 * UNITS || player.pos.y > height() + 2 * UNITS) {
         attemptReset();
       }
       const curAnim = player.curAnim();
       if (player.isKicking) {
         player.play("kicking", { loop: true });
+      } else if (state_default.level.isRecovering) {
+        player.play("landing");
       } else if (player.state === "prelaunch" && curAnim !== "idle") {
         player.play("idle", { loop: true, speed: 4 });
       } else if (player.state === "launching" && curAnim !== "crouch") {
@@ -2620,14 +2708,14 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
           player.flipX(false);
           player.angle = 0;
         }
-      } else if (curAnim !== "idle" && (get("enemy").length === 0 || state_default.level.isWon === true)) {
+      } else if (curAnim !== "idle" && (get("target").length === 0 || state_default.level.isWon === true)) {
         player.play("idle", { loop: true, speed: 4 });
       }
     });
   }, "registerPlayerActions");
 
   // code/events/collisions.js
-  var registerCollisions = /* @__PURE__ */ __name(({ checkEnd }) => {
+  var registerCollisions = /* @__PURE__ */ __name(({ endThrow, checkEnd }) => {
     const attemptAmmoRecover = /* @__PURE__ */ __name((blade) => {
       if (!blade.isRecovered) {
         state_default.level.ammoRecovered++;
@@ -2645,9 +2733,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       if (player.state !== "landed" && !player.isFalling) {
         player.state = "landed";
         player.isKicking = false;
-        player.isThrowing = false;
-        state_default.level.isSlowMo = false;
-        destroyAll("throwArrow");
+        endThrow(player);
         checkEnd();
       }
     });
@@ -2705,12 +2791,297 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     });
   }, "registerCollisions");
 
+  // code/entities/boss.js
+  var MOVE_SPEED = 8 * UNITS;
+  var MIN_TARGET_SEARCH_TIME = 0.5;
+  var MIN_STEPS = 3;
+  var MAX_STEPS = 5;
+  var ACCELERATION_SPEED = 20;
+  var CHARGING_TIME = 80;
+  var SHOOTING_TIME = 120;
+  var HEALTH = 3;
+  var createBoss = /* @__PURE__ */ __name(() => {
+    const bossTargets = get("bossTarget");
+    const tops = get("top");
+    const rooftop = tops[Math.floor(tops.length / 2)];
+    const heightModifer = -1.75 * UNITS;
+    let searchingForTarget = false;
+    let acceleration = 0;
+    let stepsTilNextPhase = Math.floor(rand(MIN_STEPS, MAX_STEPS));
+    let inPhase;
+    const bossHead = add([
+      "bossHead",
+      sprite("bossHead"),
+      scale(0.5),
+      pos(16 * UNITS, rooftop.pos.y - 10 * UNITS),
+      origin("center"),
+      z(2)
+    ]);
+    let bossTarget = choose(bossTargets);
+    let bossSpeed = bossHead.pos.dist(bossTarget);
+    const bossEye = add([
+      "bossEye",
+      "target",
+      sprite("bossEye"),
+      scale(0.5),
+      area(),
+      pos(bossHead.pos),
+      follow(bossHead, vec2(8, 0.5 * UNITS)),
+      origin("center"),
+      z(3),
+      __spreadValues({
+        isCharging: false,
+        isShooting: false,
+        chargeTimer: CHARGING_TIME,
+        shootTimer: SHOOTING_TIME,
+        disabled: false,
+        health: HEALTH,
+        canAttack: true
+      }, shakeableProps)
+    ]);
+    const bossLaser = add([
+      "bossLaser",
+      sprite("bossLaser", { height: 24 * UNITS }),
+      scale(0.5),
+      area(),
+      pos(bossEye.pos),
+      follow(bossEye),
+      origin("top"),
+      opacity(0),
+      z(3)
+    ]);
+    bossLaser.play("main", { loop: true });
+    const createLaserCollider = /* @__PURE__ */ __name(() => {
+      add([
+        "bossLaserCollider",
+        rect(2 * UNITS, 2 * UNITS),
+        area(),
+        pos(rooftop.pos),
+        origin("bot"),
+        z(4),
+        opacity(),
+        ...getColliderComps(COLORS.RED)
+      ]);
+    }, "createLaserCollider");
+    const bossBlast = add([
+      "bossBlast",
+      sprite("bossBlast"),
+      scale(0.6),
+      pos(rooftop.pos.add(0, 0.25 * UNITS)),
+      origin("bot"),
+      z(5),
+      opacity(0)
+    ]);
+    bossBlast.play("main", { loop: true });
+    const bossBody = add([
+      "bossBody",
+      sprite("bossBody"),
+      rotate(0),
+      scale(0.5, 0.75),
+      origin("top"),
+      pos(bossHead.pos),
+      follow(bossHead),
+      z(1)
+    ]);
+    const leftHand = add([
+      "bossHand",
+      "leftBossHand",
+      sprite("bossHand", { flipX: false }),
+      origin("center"),
+      pos(16 * UNITS - 6 * UNITS, rooftop.pos.y + heightModifer),
+      scale(0.75),
+      z(4)
+    ]);
+    const rightHand = add([
+      "bossHand",
+      "rightBossHand",
+      sprite("bossHand", { flipX: true }),
+      origin("center"),
+      pos(16 * UNITS + 6 * UNITS, rooftop.pos.y + heightModifer),
+      scale(0.75),
+      z(4)
+    ]);
+    const leftArm = add([
+      rect(1 * UNITS, 10 * UNITS),
+      area(),
+      color(COLORS.DARK_GREY),
+      pos(bossBody.pos),
+      follow(bossBody, vec2(-0.5 * UNITS, 3 * UNITS)),
+      origin("top")
+    ]);
+    leftHand.action(() => {
+      leftArm.angle = leftArm.pos.angle(leftHand.pos) + 90;
+      leftArm.height = leftArm.pos.dist(leftHand.pos);
+    });
+    const slam = /* @__PURE__ */ __name((isBig) => {
+      leftHand.moveTo(leftHand.pos.sub(-0.5 * UNITS, -4 * UNITS), 200);
+      rightHand.moveTo(rightHand.pos.sub(0.5 * UNITS, -4 * UNITS), 200);
+    }, "slam");
+    const rightArm = add([
+      rect(1 * UNITS, 10 * UNITS),
+      area(),
+      color(COLORS.DARK_GREY),
+      pos(bossBody.pos),
+      follow(bossBody, vec2(0.5 * UNITS, 3 * UNITS)),
+      origin("top")
+    ]);
+    rightHand.action(() => {
+      rightArm.angle = rightArm.pos.angle(rightHand.pos) + 90;
+      rightArm.height = rightArm.pos.dist(rightHand.pos);
+    });
+    const searchForTarget = /* @__PURE__ */ __name(() => {
+      searchingForTarget = true;
+      wait(rand(0.5, 3) + MIN_TARGET_SEARCH_TIME, () => {
+        searchingForTarget = false;
+        bossTarget = choose(bossTargets);
+      });
+    }, "searchForTarget");
+    const endPhase = /* @__PURE__ */ __name(() => {
+      bossEye.isCharging = false;
+      bossEye.isShooting = false;
+      destroyAll("bossLaserCollider");
+      bossLaser.opacity = 0;
+      bossBlast.opacity = 0;
+      bossEye.chargeTimer = CHARGING_TIME;
+      bossEye.shootTimer = SHOOTING_TIME;
+      stepsTilNextPhase = Math.floor(rand(MIN_STEPS, MAX_STEPS));
+      inPhase = false;
+    }, "endPhase");
+    const startNewPhase = /* @__PURE__ */ __name(() => {
+      inPhase = true;
+      wait(1, () => {
+        bossEye.isCharging = true;
+      });
+    }, "startNewPhase");
+    bossHead.action(() => {
+      const player = get("player")[0];
+      if (!inPhase && !bossEye.disabled) {
+        if (bossHead.pos.dist(bossTarget.pos) === 0) {
+          if (!searchingForTarget) {
+            stepsTilNextPhase--;
+            acceleration = 0;
+            if (stepsTilNextPhase === 0 && !state_default.level.isRecovering) {
+              startNewPhase();
+              return;
+            }
+            searchForTarget();
+          }
+        } else {
+          bossHead.moveTo(bossTarget.pos, (MOVE_SPEED + acceleration) * speedModifier());
+          if (!state_default.level.isSlowMo) {
+            acceleration += ACCELERATION_SPEED;
+          }
+        }
+      }
+    });
+    bossBody.action(() => {
+      const newAngle = bossBody.pos.angle(vec2(16 * UNITS, 18 * UNITS)) + 90;
+      bossBody.angle = newAngle;
+    });
+    bossEye.action(() => {
+      const player = get("player")[0];
+      bossEye.angle = bossEye.pos.angle(player.pos) + 90;
+      const curAnim = bossEye.curAnim();
+      if (bossEye.isCharging) {
+        if (curAnim !== "charging") {
+          bossEye.play("charging", { loop: true, pingpong: true });
+        } else {
+          bossEye.chargeTimer -= 1 * speedModifier();
+          if (bossEye.chargeTimer <= 0) {
+            bossEye.isCharging = false;
+            bossEye.chargeTimer = CHARGING_TIME;
+            bossEye.isShooting = true;
+            createLaserCollider();
+            bossLaser.opacity = 1;
+            bossBlast.opacity = 1;
+          }
+        }
+      } else if (bossEye.isShooting) {
+        if (curAnim !== "shooting") {
+          bossEye.play("shooting", { loop: true, pingpong: true });
+        } else {
+          bossEye.shootTimer -= 1 * speedModifier();
+          if (bossEye.shootTimer <= 0) {
+            endPhase();
+          }
+        }
+      } else if (bossEye.disabled) {
+        if (inPhase) {
+          endPhase();
+        }
+        if (bossHead.pos.y < rooftop.pos.y - 2 * UNITS) {
+          shake(10);
+          bossHead.pos = bossHead.pos.add(0, 1);
+        } else {
+        }
+      } else if (curAnim !== "idle") {
+        bossEye.play("idle", { loop: true });
+      }
+    });
+    bossLaser.action(() => {
+      const newAngle = bossLaser.pos.angle(rooftop.pos.add(0, 0.25 * UNITS)) + 90;
+      bossLaser.angle = newAngle;
+      if (bossEye.isShooting) {
+        shake(4);
+      }
+    });
+    collides("blade", "bossEye", (blade, bossEye2) => {
+      if (bossEye2.isCharging || bossEye2.isShooting) {
+        shake(10);
+        bossEye2.health--;
+        endPhase();
+        if (bossEye2.health <= 0) {
+          bossEye2.disabled = true;
+        } else {
+          wait(1, () => {
+            slam();
+          });
+        }
+        shakeEntity(bossHead);
+        flash(bossEye2, COLORS.BLACK);
+        blade.destroy();
+      } else {
+        blade.throwAngle += 270;
+        shake(5);
+        flash(bossEye2);
+      }
+    });
+    collides("bossLaserCollider", "player", (bossLaserCollider, player) => {
+      console.log("here");
+      if (bossEye.isShooting && !state_default.level.isRecovering) {
+        state_default.health--;
+        if (state_default.health <= 0) {
+          wait(2, () => {
+            go("gameOver");
+          });
+        }
+        state_default.level.isRecovering = true;
+        wait(5, () => {
+          state_default.level.isRecovering = false;
+        });
+      }
+    });
+  }, "createBoss");
+  var createBossTarget = /* @__PURE__ */ __name(() => {
+    return [
+      "bossTarget",
+      rect(1 * UNITS, 1 * UNITS),
+      area(),
+      opacity(0)
+    ];
+  }, "createBossTarget");
+
   // code/loadLevel.js
   var loadLevel = /* @__PURE__ */ __name((level, launchId, landId) => {
+    let shouldCreateBoss = false;
     addLevel(level, {
       width: 48,
       height: 48,
       "@": () => createPlayer(),
+      "!": () => {
+        shouldCreateBoss = true;
+      },
+      "?": () => createBossTarget(),
       "_": () => [...tileComps, "launch", sprite(`building${launchId}`, { frame: 0 })],
       "A": () => [...tileComps, "launch", sprite(`building${launchId}`, { frame: 2 })],
       "B": () => [...tileComps, "launch", sprite(`building${launchId}`, { frame: 3 })],
@@ -2718,7 +3089,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       "D": () => [...tileComps, "launch", sprite(`building${launchId}`, { frame: 5 })],
       "E": () => [...tileComps, "launch", sprite(`building${launchId}`, { frame: 6 })],
       "F": () => [...tileComps, "launch", sprite(`building${launchId}`, { frame: 7 })],
-      "T": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 0 })],
+      "T": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 0 }), "top"],
       "0": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 0 }), "wall"],
       "1": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 2 }), "wall"],
       "2": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 3 })],
@@ -2731,6 +3102,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       "9": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 6 })],
       "x": () => [
         "enemy",
+        "target",
         "kickable",
         rect(1 * UNITS, 2 * UNITS),
         area(),
@@ -2744,6 +3116,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       ],
       "o": () => [
         "enemy",
+        "target",
         "flier",
         rect(1 * UNITS, 1 * UNITS),
         area(),
@@ -2756,31 +3129,36 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         }, moverProps)
       ]
     });
+    if (shouldCreateBoss) {
+      createBoss();
+    }
   }, "loadLevel");
   var loadLevel_default = loadLevel;
 
   // code/scenes/game.js
   var GRAVITY = 0.2;
-  var SLOW_MO_MODIFIER = 0.045;
-  var STARTING_AMMO_COUNT = 3;
+  var STARTING_AMMO_COUNT = 5;
   var STARTING_SMOKE_BOMB_COUNT = 3;
   var WALL_COLLIDER_THICKNESS = 16;
   var LAUNCH_ARROW_SPEED = 0.75;
   var LAUNCH_ARROW_MIN_ANGLE = 0;
   var LAUNCH_ARROW_MAX_ANGLE = 90;
   var LAUNCH_ARROW_STRENGHT_SPEED = 0.01;
+  var LAUNCH_ARROW_SCALE = 0.5;
   var LAUNCH_ARROW_MAX_STRENGTH = 2;
   var LAUNCH_ARROW_STRENGTH_MODIFIER = 10;
+  var LAUNCH_ARROW_BOSS_BATTLE_OPACITY = 0.5;
   var THROW_ARROW_SPEED = 2;
   var BLADE_SPEED = 1e3;
   var BLADE_START_DISTANCE = 50;
   var launchArrowComps = [
     "launchArrow",
     sprite("arrow"),
-    scale(0.5, 0.5),
+    scale(LAUNCH_ARROW_SCALE, LAUNCH_ARROW_SCALE),
     rotate(0),
     origin("center"),
-    area()
+    area(),
+    layer("ui")
   ];
   var throwArrowComps = [
     "throwArrow",
@@ -2790,7 +3168,8 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     pos(-2 * UNITS, -2 * UNITS),
     origin("center"),
     area(),
-    opacity(0)
+    opacity(0),
+    layer("ui")
   ];
   kaboom_default2.scene("game", (args = {}) => {
     resetLevelState();
@@ -2804,7 +3183,6 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     let ammoCounter;
     let smokeBombCounter;
     let startingPosition;
-    const speedModifier = /* @__PURE__ */ __name(() => state_default.level.isSlowMo ? SLOW_MO_MODIFIER : 1, "speedModifier");
     const getAmmoCounterText = /* @__PURE__ */ __name(() => `Ammo: ${ammoCount}`, "getAmmoCounterText");
     const getSmokeBombCounterText = /* @__PURE__ */ __name(() => `Smoke Bombs: ${smokeBombCount}`, "getSmokeBombCounterText");
     layers([
@@ -2856,6 +3234,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         }
       });
       loadLevel_default(levels_default[currentLevel], state_default.currentBuilding, nextBuilding);
+      state_default.level.isBossBattle = get("bossEye").length > 0;
       const player = get("player")[0];
       addPlayerColliders(player);
       player.play("landing");
@@ -2886,13 +3265,14 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
           }
         ]);
       });
-      launchArrow = add([...launchArrowComps, pos(player.pos)]);
+      launchArrow = add([...launchArrowComps, pos(player.pos.sub(0.02 * UNITS, 0)), opacity(state_default.level.isBossBattle ? LAUNCH_ARROW_BOSS_BATTLE_OPACITY : 1)]);
       add([...throwArrowComps, follow(player)]);
     }, "startLevel");
     startLevel(0);
     const reset = /* @__PURE__ */ __name(() => {
       useSmokeBomb();
       destroyPlayer();
+      console.trace("hwhy");
       destroyAll("throwArrow");
       launchArrow.destroy();
       state_default.level.isSlowMo = false;
@@ -2927,12 +3307,21 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       }
     }, "useSmokeBomb");
     const startThrow = /* @__PURE__ */ __name(() => {
+      console.log("callingStartThrow");
       const player = get("player")[0];
       const throwArrow = get("throwArrow")[0];
       player.isThrowing = true;
       state_default.level.isSlowMo = true;
       throwArrow.opacity = 1;
     }, "startThrow");
+    const endThrow = /* @__PURE__ */ __name((player) => {
+      const throwArrow = get("throwArrow")[0];
+      throwArrow.opacity = 0;
+      throwArrow.angle = 0;
+      player.isThrowing = false;
+      console.log("what is happening?", player.isThrowing);
+      state_default.level.isSlowMo = false;
+    }, "endThrow");
     const throwBlade = /* @__PURE__ */ __name(() => {
       const throwArrow = get("throwArrow")[0];
       const bladePos = throwArrow.pos.add(dir(throwArrow.angle - 90).scale(BLADE_START_DISTANCE));
@@ -2941,7 +3330,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         rect(10, 10),
         area(),
         pos(bladePos),
-        z(1),
+        z(5),
         __spreadValues({
           speed: BLADE_SPEED,
           throwAngle: throwArrow.angle - 90,
@@ -2952,7 +3341,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     }, "throwBlade");
     const gameAction = /* @__PURE__ */ __name(() => {
       const player = get("player")[0];
-      if (player.state === "launched" && !player.isThrowing && !player.isKicking) {
+      if (player.state === "launched" && !player.isThrowing && !player.isKicking && !state_default.level.isRecovering) {
         ammoCount > 0 ? startThrow() : flashAmmo();
       } else if (player.isThrowing) {
         ammoCount > 0 ? throwBlade() : flashAmmo();
@@ -2966,7 +3355,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     }, "gameAction");
     const actionDown = /* @__PURE__ */ __name(() => {
       const player = get("player")[0];
-      if (player.state === "prelaunch") {
+      if (player.state === "prelaunch" && !state_default.level.isRecovering) {
         player.state = "launching";
       }
     }, "actionDown");
@@ -2975,7 +3364,8 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       if (player.state === "launching") {
         player.state = "launched";
         const start = vec2(0, 0);
-        const end = start.add(dir(LAUNCH_ARROW_MAX_ANGLE - launchArrow.angle).scale(launchArrow.scale.scale(LAUNCH_ARROW_STRENGTH_MODIFIER)));
+        const direction2 = state_default.level.isBossBattle ? 90 : LAUNCH_ARROW_MAX_ANGLE - launchArrow.angle;
+        const end = start.add(dir(direction2).scale(launchArrow.scale.scale(LAUNCH_ARROW_STRENGTH_MODIFIER)));
         player.use("mover");
         player.sideSpeed = end.x;
         player.upSpeed = end.y;
@@ -3014,7 +3404,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         const stats = add([
           rect(10 * UNITS, 6 * UNITS),
           area(),
-          color(40, 40, 60),
+          color(COLORS.BLACK),
           pos(16 * UNITS, 2 * UNITS),
           origin("top"),
           layer("ui")
@@ -3062,13 +3452,18 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     const incompleteLevel = /* @__PURE__ */ __name(() => {
       wait(1, () => {
         every("enemy", (enemy) => {
-          if (!enemy.disabled) {
+          if (!enemy.disabled && !state_default.level.isBossBattle) {
             enemy.color = COLORS.RED;
           }
         });
       });
       wait(2, () => {
-        attemptReset();
+        const player = get("player")[0];
+        if (state_default.level.isBossBattle) {
+          player.state = "prelaunch";
+        } else {
+          attemptReset();
+        }
       });
     }, "incompleteLevel");
     const checkEnd = /* @__PURE__ */ __name(() => {
@@ -3081,8 +3476,8 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       });
       if (isEnded) {
         let isVictory = true;
-        every("enemy", (enemy) => {
-          if (!enemy.disabled) {
+        every("target", (target) => {
+          if (!target.disabled) {
             isVictory = false;
           }
         });
@@ -3110,29 +3505,31 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     action("launchArrow", (launchArrow2) => {
       const player = get("player")[0];
       if (player.state === "prelaunch") {
-        if (launchArrow2.angle <= LAUNCH_ARROW_MIN_ANGLE) {
-          direction = 1;
-        } else if (launchArrow2.angle >= LAUNCH_ARROW_MAX_ANGLE) {
-          direction = -1;
+        launchArrow2.opacity = state_default.level.isRecovering ? 0 : LAUNCH_ARROW_BOSS_BATTLE_OPACITY;
+        if (!state_default.level.isBossBattle) {
+          if (launchArrow2.angle <= LAUNCH_ARROW_MIN_ANGLE) {
+            direction = 1;
+          } else if (launchArrow2.angle >= LAUNCH_ARROW_MAX_ANGLE) {
+            direction = -1;
+          }
+          launchArrow2.angle = launchArrow2.angle + direction * LAUNCH_ARROW_SPEED;
         }
-        launchArrow2.angle = launchArrow2.angle + direction * LAUNCH_ARROW_SPEED;
       } else if (player.state === "launching") {
         if (launchArrow2.scale.x <= LAUNCH_ARROW_MAX_STRENGTH) {
           launchArrow2.scale = launchArrow2.scale.add(LAUNCH_ARROW_STRENGHT_SPEED, LAUNCH_ARROW_STRENGHT_SPEED);
         }
       } else if (player.state === "launched") {
-        launchArrow2.destroy();
+        launchArrow2.opacity = 0;
+        launchArrow2.scale = vec2(LAUNCH_ARROW_SCALE, LAUNCH_ARROW_SCALE);
       }
     });
     action("throwArrow", (throwArrow) => {
       const player = get("player")[0];
       if (state_default.level.isSlowMo) {
         throwArrow.angle += THROW_ARROW_SPEED;
-        if (throwArrow.angle === 360) {
-          state_default.level.isSlowMo = false;
+        if (throwArrow.angle === 360 || state_default.level.isRecovering) {
+          endThrow(player);
           player.state = "afterThrow";
-          player.isThrowing = false;
-          throwArrow.destroy();
         }
       }
     });
@@ -3142,8 +3539,17 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         mover.upSpeed -= gravity;
       }
     });
+    action("shake", (shakeable) => {
+      if (shakeable.pos.y <= shakeable.shakeTop) {
+        shakeable.direction = 1;
+      } else if (shakeable.pos.y >= shakeable.shakeBottom) {
+        shakeable.direction = -1;
+      }
+      console.log(shakeable.direction);
+      shakeable.moveBy(0, shakeable.direction * 0.5 * UNITS);
+    });
     registerPlayerActions({ attemptReset });
-    registerCollisions({ checkEnd });
+    registerCollisions({ endThrow, checkEnd });
   });
 
   // code/scenes/title.js
@@ -3175,7 +3581,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     add([
       "background",
       rect(width(), height()),
-      color(20, 20, 40)
+      color(COLORS.BLACK)
     ]);
     add([
       "title",
@@ -3205,7 +3611,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     add([
       "background",
       rect(width(), height()),
-      color(20, 20, 40)
+      color(COLORS.BLACK)
     ]);
     add([
       "title",

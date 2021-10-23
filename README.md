@@ -1,4 +1,4 @@
-# Throwing Stars (Real Name TBD)
+# Goliath
 
 The goal is to hit targets with your throwing weapon.
 Click and hold to start your jump, how long you hold determines how far you jump.

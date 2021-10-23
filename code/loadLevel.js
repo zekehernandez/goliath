@@ -1,15 +1,20 @@
 import { UNITS } from './constants';
-import { COLORS, getColliderComps } from './game.constants';
+import { COLORS, getColliderComps } from './utils';
 import { moverProps, kickableProps, tileComps } from './entities';
 import { createPlayer } from './entities/player';
+import { createBoss, createBossTarget } from './entities/boss';
 
 const loadLevel = (level, launchId, landId) => {
+  let shouldCreateBoss = false;
+
   addLevel(level, {
     // define the size of each block
     width: 48,
     height: 48,
     // define what each symbol means, by a function returning a comp list (what you'll pass to add())
     "@": () => createPlayer(),
+    "!": () => { shouldCreateBoss = true },
+    "?": () => createBossTarget(),
     "_": () => [...tileComps, "launch", sprite(`building${launchId}`, { frame: 0 })],
     "A": () => [...tileComps, "launch", sprite(`building${launchId}`, { frame: 2 })],
     "B": () => [...tileComps, "launch", sprite(`building${launchId}`, { frame: 3 })],
@@ -17,7 +22,7 @@ const loadLevel = (level, launchId, landId) => {
     "D": () => [...tileComps, "launch", sprite(`building${launchId}`, { frame: 5 })],
     "E": () => [...tileComps, "launch", sprite(`building${launchId}`, { frame: 6 })],
     "F": () => [...tileComps, "launch", sprite(`building${launchId}`, { frame: 7 })],
-    "T": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 0 })],
+    "T": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 0 }), "top"],
     "0": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 0 }), "wall"],
     "1": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 2 }), "wall"],
     "2": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 3 })],
@@ -30,6 +35,7 @@ const loadLevel = (level, launchId, landId) => {
     "9": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 6 })],
     "x": () => [
       "enemy",
+      "target",
       "kickable",
       rect(1*UNITS, 2*UNITS),
       area(),
@@ -44,6 +50,7 @@ const loadLevel = (level, launchId, landId) => {
     ],
     "o": () => [
       "enemy",
+      "target",
       "flier",
       rect(1*UNITS, 1*UNITS),
       area(),
@@ -57,6 +64,10 @@ const loadLevel = (level, launchId, landId) => {
       },
     ],
   });
+
+  if (shouldCreateBoss) {
+    createBoss();
+  }
 }
 
 export default loadLevel;

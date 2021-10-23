@@ -13,4 +13,11 @@ export const tileComps = [
   area(),
   solid(),
   scale(0.5),
+  z(4),
 ];
+
+export const shakeableProps = {
+  shakeTop: 0,
+  shakeBottom: 0,
+  direction: -1,
+}

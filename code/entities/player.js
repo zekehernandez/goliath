@@ -2,14 +2,14 @@ import k from "../kaboom";
 import { moverProps } from './';
 import state from '../state';
 import { UNITS } from '../constants';
-import { COLORS, getColliderComps } from '../game.constants';
+import { COLORS, getColliderComps } from '../utils';
 import { START_JUMP_END_FRAME, LANDING_END_FRAME, FALLING_END_FRAME } from '../loadAssets';
 
 const playerComps = [
   "player",
     sprite("player"),
     scale(2, 2),
-    z(1),
+    z(5),
     area(),
     origin("center"),
     {
@@ -52,6 +52,8 @@ export const addPlayerColliders = () => {
 export const registerPlayerActions = ({ attemptReset }) => {
   // player movement
   action("player", player => {
+    console.log(`state: ${player.state}, isThrowing: ${player.isThrowing}, isRecovering: ${state.level.isRecovering}`);
+
     if (player.pos.x > width() + 2*UNITS || player.pos.y > height() + 2*UNITS) {
       attemptReset();
     }
@@ -60,6 +62,8 @@ export const registerPlayerActions = ({ attemptReset }) => {
     const curAnim = player.curAnim();
     if (player.isKicking) {
       player.play("kicking", { loop: true })
+    } else if (state.level.isRecovering) {
+      player.play("landing")
     } else if (player.state === "prelaunch" && curAnim !== "idle") {
       player.play("idle", { loop: true, speed: 4 });
     } else if (player.state === "launching" && curAnim !== "crouch") {
@@ -87,7 +91,7 @@ export const registerPlayerActions = ({ attemptReset }) => {
         player.flipX(false);
         player.angle = 0;
       }
-    } else if (curAnim !== "idle" && (get("enemy").length === 0 || state.level.isWon === true)) {
+    } else if (curAnim !== "idle" && (get("target").length === 0 || state.level.isWon === true)) {
       player.play("idle", { loop: true, speed: 4});
     }
   });
