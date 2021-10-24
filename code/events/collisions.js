@@ -34,11 +34,14 @@ export const registerCollisions = ({ endThrow, checkEnd }) => {
     }
   });
 
-  collides("blade", "enemy", (blade, enemy) => {
+  collides("blade", "enemyHurtbox", (blade, enemyHurtbox) => {
+    const enemy = enemyHurtbox.owner;
     const wasPreviouslyDisabled = enemy.disabled;
     blade.speed = 0;
     enemy.disabled = true;
-    enemy.color = COLORS.GREY;
+    enemy.play("disabled", { loop: true });
+    enemy.eye && enemy.eye.play("disabled");
+    enemy.thruster && enemy.thruster.destroy();
     attemptAmmoRecover(blade);
     shake(5);
     if (!wasPreviouslyDisabled) {
@@ -46,7 +49,8 @@ export const registerCollisions = ({ endThrow, checkEnd }) => {
     }
   });
 
-  collides("blade", "flier", (blade, flier) => {
+  collides("blade", "flierHurtbox", (blade, flierHurtbox) => {
+    const flier = flierHurtbox.owner;
     flier.use("mover");
     blade.use(follow(flier, blade.pos.sub(flier.pos)));
     attemptAmmoRecover(blade);
@@ -62,7 +66,9 @@ export const registerCollisions = ({ endThrow, checkEnd }) => {
     checkEnd();
   });
 
-  collides("player", "flier", (player, flier) => {
+  collides("player", "flierHurtbox", (player, flierHurtbox) => {
+    const flier = flierHurtbox.owner;
+    console.log('flier');
     if (!flier.disabled) {
       shake(10);
       player.sideSpeed = 0;
@@ -75,9 +81,13 @@ export const registerCollisions = ({ endThrow, checkEnd }) => {
       state.level.isSlowMo = true;
       kickable.disabled = true;
       kickable.color = COLORS.GREY;
+      const kickDirection = player.pos.sub(kickable.pos).x;
+      if (kickable.curAnim() !== "kicked" && kickDirection - 1) {
+        kickable.play("kicked", { loop: true })
+      }
       shake(10);
       wait(1, () => {
-        kickable.kickDirection = player.pos.sub(kickable.pos).x;
+        kickable.kickDirection = kickDirection;
         state.level.isSlowMo = false;
         player.isKicking = false;
       })

@@ -36,8 +36,10 @@ export const createBoss = () => {
   let bossSpeed = bossHead.pos.dist(bossTarget);
 
   const bossEye = add([
+    "eye",
     "bossEye",
     "target",
+    "animated",
     sprite("bossEye"),
     scale(0.5),
     area(),
@@ -59,6 +61,7 @@ export const createBoss = () => {
 
   const bossLaser = add([
     "bossLaser",
+    "animated",
     sprite("bossLaser", { height: 24*UNITS }),
     scale(0.5),
     area(),
@@ -86,6 +89,7 @@ export const createBoss = () => {
 
   const bossBlast = add([
     "bossBlast",
+    "animated",
     sprite("bossBlast"),
     scale(0.6),
     pos(rooftop.pos.add(0, 0.25*UNITS)),
@@ -217,7 +221,6 @@ export const createBoss = () => {
 
   bossEye.action(() => {
     const player = get("player")[0];
-    bossEye.angle = bossEye.pos.angle(player.pos) + 90;
 
     const curAnim = bossEye.curAnim();
     if (bossEye.isCharging) {
@@ -251,7 +254,7 @@ export const createBoss = () => {
         shake(10);
         bossHead.pos = bossHead.pos.add(0, 1);
       } else {
-
+        bossEye.play("disabled");
       }
 
     } else if (curAnim !== "idle") {

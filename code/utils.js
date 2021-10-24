@@ -32,3 +32,19 @@ export const shakeEntity = (entity) => {
     entity.unuse("shake");
   });
 }
+
+export const addExplosion = position => {
+  const explosion = add([
+    "explosion",
+    sprite("explosion"),
+    pos(position),
+    scale(0.5, 0.5),
+    origin("center"),
+    z(4),
+  ]);
+
+  explosion.play("main", { onEnd: () => {
+    explosion.destroy();
+  }});
+  wait(0.1, () => {  shake(20) })
+}

@@ -2375,9 +2375,8 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
   var kaboom_default2 = k;
 
   // code/loadAssets.js
-  var START_JUMP_END_FRAME = 49;
-  var LANDING_END_FRAME = 59;
-  var FALLING_END_FRAME = 77;
+  var START_JUMP_END_FRAME = 31;
+  var LANDING_END_FRAME = 35;
   var BUILDING_COUNT = 3;
   var loadAssets = /* @__PURE__ */ __name(() => {
     const loadBuilding = /* @__PURE__ */ __name((id) => {
@@ -2390,6 +2389,16 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     kaboom_default2.loadSprite("arrow", "sprites/arrow.png");
     kaboom_default2.loadSprite("background", "sprites/background.png");
     kaboom_default2.loadSprite("title", "sprites/title.png");
+    kaboom_default2.loadSprite("explosion", "sprites/explosion.png", {
+      sliceX: 12,
+      sliceY: 1,
+      anims: {
+        main: {
+          from: 1,
+          to: 11
+        }
+      }
+    });
     kaboom_default2.loadSprite("bossHead", "sprites/goliath_head.png");
     kaboom_default2.loadSprite("bossBody", "sprites/goliath_body.png");
     kaboom_default2.loadSprite("bossHand", "sprites/goliath_hand.png");
@@ -2419,13 +2428,14 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         x: 0,
         y: 0,
         width: 576,
-        height: 576,
+        height: 768,
         sliceX: 3,
-        sliceY: 3,
+        sliceY: 4,
         anims: {
           idle: { from: 0, to: 0 },
           charging: { from: 3, to: 5 },
-          shooting: { from: 6, to: 8 }
+          shooting: { from: 6, to: 8 },
+          disabled: { from: 9, to: 9 }
         }
       }
     });
@@ -2433,19 +2443,58 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       "player": {
         x: 0,
         y: 0,
-        width: 720,
-        height: 336,
-        sliceX: 15,
+        width: 96 * 9,
+        height: 96 * 7,
+        sliceX: 9,
         sliceY: 7,
         anims: {
-          idle: { from: 15, to: 21 },
-          crouch: { from: 30, to: 35 },
-          startJump: { from: 47, to: START_JUMP_END_FRAME },
-          somersault: { from: 50, to: 55 },
-          landing: { from: 58, to: LANDING_END_FRAME },
-          throwing: { from: 60, to: 60 },
-          falling: { from: 75, to: FALLING_END_FRAME },
-          kicking: { from: 90, to: 90 }
+          idle: { from: 9, to: 9 },
+          crouch: { from: 18, to: 18 },
+          startJump: { from: 27, to: START_JUMP_END_FRAME },
+          somersault: { from: 32, to: 32 },
+          landing: { from: 34, to: LANDING_END_FRAME },
+          throwing: { from: 36, to: 38 },
+          kicking: { from: 54, to: 54 },
+          smokeBomb: { from: 1, to: 4 }
+        }
+      }
+    });
+    kaboom_default2.loadSpriteAtlas("sprites/stander_atlas.png", {
+      "stander": {
+        x: 0,
+        y: 0,
+        width: 1152,
+        height: 1152,
+        sliceX: 6,
+        sliceY: 3,
+        anims: {
+          idle: { from: 0, to: 5 },
+          disabled: { from: 6, to: 11 },
+          kicked: { from: 12, to: 13 }
+        }
+      }
+    });
+    kaboom_default2.loadSpriteAtlas("sprites/flier_atlas.png", {
+      "flier": {
+        x: 0,
+        y: 0,
+        width: 96 * 8,
+        height: 96 * 2,
+        sliceX: 8,
+        sliceY: 2,
+        anims: {
+          idle: { from: 0, to: 5 },
+          disabled: { from: 8, to: 15 }
+        }
+      }
+    });
+    kaboom_default2.loadSprite("thruster", "sprites/thruster.png", {
+      sliceX: 3,
+      sliceY: 1,
+      anims: {
+        main: {
+          from: 0,
+          to: 2
         }
       }
     });
@@ -2484,6 +2533,22 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       entity.unuse("shake");
     });
   }, "shakeEntity");
+  var addExplosion = /* @__PURE__ */ __name((position) => {
+    const explosion = add([
+      "explosion",
+      sprite("explosion"),
+      pos(position),
+      scale(0.5, 0.5),
+      origin("center"),
+      z(4)
+    ]);
+    explosion.play("main", { onEnd: () => {
+      explosion.destroy();
+    } });
+    wait(0.1, () => {
+      shake(20);
+    });
+  }, "addExplosion");
 
   // code/levels.js
   var levels_default = [
@@ -2636,9 +2701,9 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
   var playerComps = [
     "player",
     sprite("player"),
-    scale(2, 2),
     z(5),
     area(),
+    rotate(),
     origin("center"),
     __spreadProps(__spreadValues({}, moverProps), {
       state: "prelaunch",
@@ -2679,6 +2744,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       }
       const curAnim = player.curAnim();
       if (player.isKicking) {
+        player.angle = 0;
         player.play("kicking", { loop: true });
       } else if (state_default.level.isRecovering) {
         player.play("landing");
@@ -2689,7 +2755,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       } else if (player.state === "launched" || player.state === "afterThrow") {
         if (player.isThrowing) {
           if (curAnim !== "throwing") {
-            player.play("throwing", { loop: true });
+            player.frame = 36;
           }
           const throwArrow = get("throwArrow")[0];
           player.angle = throwArrow.angle;
@@ -2697,9 +2763,9 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
           if (curAnim === "crouch") {
             player.play("startJump", { speed: 10 });
           } else if (curAnim !== "somersault" && (curAnim !== "startJump" || player.frame >= START_JUMP_END_FRAME)) {
-            player.play("somersault", { loop: true });
+            player.frame = 32;
             player.flipX(false);
-            player.angle = 0;
+            player.angle += 20;
           }
         }
       } else if (player.state === "landed" && player.frame !== LANDING_END_FRAME) {
@@ -2713,6 +2779,140 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       }
     });
   }, "registerPlayerActions");
+
+  // code/entities/flier.js
+  var HOVER_DISTANCE = 0.25 * UNITS;
+  var FLIER_SCALE = 0.75;
+  var createFlier = /* @__PURE__ */ __name(() => {
+    return [
+      "enemy",
+      "target",
+      "flier",
+      sprite("flier"),
+      scale(FLIER_SCALE),
+      rotate(0),
+      area(),
+      solid(),
+      origin("center"),
+      z(1),
+      __spreadValues({
+        disabled: false
+      }, moverProps)
+    ];
+  }, "createFlier");
+  var addFlierParts = /* @__PURE__ */ __name(() => {
+    every("flier", (flier) => {
+      flier.play("idle", { loop: true, speed: 8 });
+      flier.startingHeight = flier.pos.y;
+      const flierHurtbox = add([
+        "flierHurtbox",
+        "enemyHurtbox",
+        rect(1 * UNITS, 1.5 * UNITS),
+        pos(flier.pos),
+        area(),
+        origin("center"),
+        follow(flier, vec2(0, 0)),
+        ...getColliderComps(),
+        {
+          owner: flier
+        }
+      ]);
+      const eye = add([
+        "eye",
+        sprite("bossEye"),
+        pos(flier.pos),
+        scale(0.15),
+        origin("center"),
+        follow(flier, vec2(0, -16)),
+        z(1),
+        {
+          owner: flier
+        }
+      ]);
+      eye.play("idle");
+      const thruster = add([
+        "thruster",
+        "animated",
+        sprite("thruster"),
+        pos(flier.pos),
+        scale(FLIER_SCALE),
+        origin("top"),
+        follow(flier, vec2(0, 0.74 * UNITS))
+      ]);
+      thruster.play("main", { loop: true });
+      flier.thruster = thruster;
+      flier.eye = eye;
+    });
+    let direction = -1;
+    action("flier", (flier) => {
+      if (!flier.disabled) {
+        if (flier.pos.y < flier.startingHeight - HOVER_DISTANCE) {
+          direction = 1;
+        } else if (flier.pos.y > flier.startingHeight + HOVER_DISTANCE) {
+          direction = -1;
+        }
+        const distanceFromStart = Math.abs(flier.startingHeight - flier.pos.y);
+        const speed = Math.abs(HOVER_DISTANCE - distanceFromStart);
+        console.log(speed);
+        flier.pos.y = flier.pos.y + direction * (1 + speed / 64) * speedModifier();
+      }
+    });
+  }, "addFlierParts");
+
+  // code/entities/stander.js
+  var createStander = /* @__PURE__ */ __name(() => {
+    return [
+      "enemy",
+      "target",
+      "kickable",
+      "stander",
+      "animated",
+      sprite("stander"),
+      area(),
+      body(),
+      scale(0.4),
+      origin("center"),
+      __spreadValues({
+        disabled: false
+      }, kickableProps)
+    ];
+  }, "createStander");
+  var addStanderParts = /* @__PURE__ */ __name(() => {
+    every("stander", (stander) => {
+      stander.play("idle", { loop: true, speed: 4, pingpong: true });
+      const standerHurtbox = add([
+        "enemyHurtbox",
+        rect(0.65 * UNITS, 2.9 * UNITS),
+        pos(stander.pos),
+        area(),
+        origin("center"),
+        follow(stander, vec2(4, 8)),
+        ...getColliderComps(),
+        {
+          owner: stander
+        }
+      ]);
+      const eye = add([
+        "eye",
+        sprite("bossEye"),
+        pos(stander.pos),
+        scale(0.12),
+        origin("center"),
+        follow(stander, vec2(-6, -43)),
+        z(1),
+        {
+          owner: stander
+        }
+      ]);
+      eye.play("idle");
+      stander.eye = eye;
+    });
+    action("stander", (stander) => {
+      if (stander.disabled) {
+        stander.eye.destroy();
+      }
+    });
+  }, "addStanderParts");
 
   // code/events/collisions.js
   var registerCollisions = /* @__PURE__ */ __name(({ endThrow, checkEnd }) => {
@@ -2744,18 +2944,22 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         player.isFalling = true;
       }
     });
-    collides("blade", "enemy", (blade, enemy) => {
+    collides("blade", "enemyHurtbox", (blade, enemyHurtbox) => {
+      const enemy = enemyHurtbox.owner;
       const wasPreviouslyDisabled = enemy.disabled;
       blade.speed = 0;
       enemy.disabled = true;
-      enemy.color = COLORS.GREY;
+      enemy.play("disabled", { loop: true });
+      enemy.eye && enemy.eye.play("disabled");
+      enemy.thruster && enemy.thruster.destroy();
       attemptAmmoRecover(blade);
       shake(5);
       if (!wasPreviouslyDisabled) {
         checkEnd();
       }
     });
-    collides("blade", "flier", (blade, flier) => {
+    collides("blade", "flierHurtbox", (blade, flierHurtbox) => {
+      const flier = flierHurtbox.owner;
       flier.use("mover");
       blade.use(follow(flier, blade.pos.sub(flier.pos)));
       attemptAmmoRecover(blade);
@@ -2769,7 +2973,9 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       state_default.level.misses++;
       checkEnd();
     });
-    collides("player", "flier", (player, flier) => {
+    collides("player", "flierHurtbox", (player, flierHurtbox) => {
+      const flier = flierHurtbox.owner;
+      console.log("flier");
       if (!flier.disabled) {
         shake(10);
         player.sideSpeed = 0;
@@ -2781,9 +2987,13 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         state_default.level.isSlowMo = true;
         kickable.disabled = true;
         kickable.color = COLORS.GREY;
+        const kickDirection = player.pos.sub(kickable.pos).x;
+        if (kickable.curAnim() !== "kicked" && kickDirection - 1) {
+          kickable.play("kicked", { loop: true });
+        }
         shake(10);
         wait(1, () => {
-          kickable.kickDirection = player.pos.sub(kickable.pos).x;
+          kickable.kickDirection = kickDirection;
           state_default.level.isSlowMo = false;
           player.isKicking = false;
         });
@@ -2820,8 +3030,10 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     let bossTarget = choose(bossTargets);
     let bossSpeed = bossHead.pos.dist(bossTarget);
     const bossEye = add([
+      "eye",
       "bossEye",
       "target",
+      "animated",
       sprite("bossEye"),
       scale(0.5),
       area(),
@@ -2841,6 +3053,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     ]);
     const bossLaser = add([
       "bossLaser",
+      "animated",
       sprite("bossLaser", { height: 24 * UNITS }),
       scale(0.5),
       area(),
@@ -2865,6 +3078,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     }, "createLaserCollider");
     const bossBlast = add([
       "bossBlast",
+      "animated",
       sprite("bossBlast"),
       scale(0.6),
       pos(rooftop.pos.add(0, 0.25 * UNITS)),
@@ -2980,7 +3194,6 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     });
     bossEye.action(() => {
       const player = get("player")[0];
-      bossEye.angle = bossEye.pos.angle(player.pos) + 90;
       const curAnim = bossEye.curAnim();
       if (bossEye.isCharging) {
         if (curAnim !== "charging") {
@@ -3013,6 +3226,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
           shake(10);
           bossHead.pos = bossHead.pos.add(0, 1);
         } else {
+          bossEye.play("disabled");
         }
       } else if (curAnim !== "idle") {
         bossEye.play("idle", { loop: true });
@@ -3077,7 +3291,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     addLevel(level, {
       width: 48,
       height: 48,
-      "@": () => createPlayer(),
+      "@": createPlayer,
       "!": () => {
         shouldCreateBoss = true;
       },
@@ -3100,34 +3314,8 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       "7": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 6 }), "wall"],
       "8": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 7 })],
       "9": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 6 })],
-      "x": () => [
-        "enemy",
-        "target",
-        "kickable",
-        rect(1 * UNITS, 2 * UNITS),
-        area(),
-        body(),
-        color(COLORS.GREEN),
-        origin("left"),
-        outline(),
-        __spreadValues({
-          disabled: false
-        }, kickableProps)
-      ],
-      "o": () => [
-        "enemy",
-        "target",
-        "flier",
-        rect(1 * UNITS, 1 * UNITS),
-        area(),
-        solid(),
-        color(COLORS.GREEN),
-        origin("left"),
-        outline(),
-        __spreadValues({
-          disabled: false
-        }, moverProps)
-      ]
+      "x": createStander,
+      "o": createFlier
     });
     if (shouldCreateBoss) {
       createBoss();
@@ -3267,6 +3455,8 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       });
       launchArrow = add([...launchArrowComps, pos(player.pos.sub(0.02 * UNITS, 0)), opacity(state_default.level.isBossBattle ? LAUNCH_ARROW_BOSS_BATTLE_OPACITY : 1)]);
       add([...throwArrowComps, follow(player)]);
+      addFlierParts();
+      addStanderParts();
     }, "startLevel");
     startLevel(0);
     const reset = /* @__PURE__ */ __name(() => {
@@ -3323,6 +3513,8 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       state_default.level.isSlowMo = false;
     }, "endThrow");
     const throwBlade = /* @__PURE__ */ __name(() => {
+      const player = get("player")[0];
+      player.play("throwing");
       const throwArrow = get("throwArrow")[0];
       const bladePos = throwArrow.pos.add(dir(throwArrow.angle - 90).scale(BLADE_START_DISTANCE));
       add([
@@ -3394,11 +3586,15 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     const winLevel = /* @__PURE__ */ __name(() => {
       wait(1, () => {
         destroyAll("blade");
+        let delay = 0;
         every("enemy", (enemy) => {
-          addKaboom(enemy.pos);
-          enemy.destroy();
+          wait(delay, () => {
+            addExplosion(enemy.pos);
+            enemy.eye && enemy.eye.destroy();
+            enemy.destroy();
+          });
+          delay += 0.25;
         });
-        shake(20);
       });
       wait(2, () => {
         const stats = add([
@@ -3453,7 +3649,9 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       wait(1, () => {
         every("enemy", (enemy) => {
           if (!enemy.disabled && !state_default.level.isBossBattle) {
-            enemy.color = COLORS.RED;
+            if (enemy.eye) {
+              enemy.eye.frame = 8;
+            }
           }
         });
       });
@@ -3505,7 +3703,11 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     action("launchArrow", (launchArrow2) => {
       const player = get("player")[0];
       if (player.state === "prelaunch") {
-        launchArrow2.opacity = state_default.level.isRecovering ? 0 : LAUNCH_ARROW_BOSS_BATTLE_OPACITY;
+        if (state_default.level.isRecovering) {
+          launchArrow2.opacity = 0;
+        } else {
+          launchArrow2.opacity = state_default.level.isBossBattle ? LAUNCH_ARROW_BOSS_BATTLE_OPACITY : 1;
+        }
         if (!state_default.level.isBossBattle) {
           if (launchArrow2.angle <= LAUNCH_ARROW_MIN_ANGLE) {
             direction = 1;
@@ -3548,6 +3750,17 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       console.log(shakeable.direction);
       shakeable.moveBy(0, shakeable.direction * 0.5 * UNITS);
     });
+    action("animated", (animated) => {
+      animated.animSpeed = speedModifier();
+    });
+    action("eye", (eye) => {
+      const player = get("player")[0];
+      if (eye.disabled || eye.owner && eye.owner.disabled) {
+        eye.angle = 0;
+      } else {
+        eye.angle = eye.pos.angle(player.pos) + 90;
+      }
+    });
     registerPlayerActions({ attemptReset });
     registerCollisions({ endThrow, checkEnd });
   });
@@ -3587,13 +3800,13 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       "title",
       text("You Win!", { size: 60 }),
       origin("center"),
-      pos(center().x, center().y - 100)
+      pos(16 * UNITS, center().y - 100)
     ]);
     const cta = add([
       "cta",
       text("Click to play again", { size: 30 }),
-      origin("center"),
-      pos(center().x, center().y + 50),
+      pos(31 * UNITS, 17 * UNITS),
+      origin("right"),
       opacity(0)
     ]);
     loop(0.75, () => {
@@ -3617,13 +3830,13 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       "title",
       text("GAME OVER", { size: 60 }),
       origin("center"),
-      pos(center().x, center().y - 100)
+      pos(16 * UNITS, center().y - 100)
     ]);
     const cta = add([
       "cta",
       text("Click to try again", { size: 30 }),
-      origin("center"),
-      pos(center().x, center().y + 50),
+      pos(31 * UNITS, 17 * UNITS),
+      origin("right"),
       opacity(0)
     ]);
     loop(0.75, () => {

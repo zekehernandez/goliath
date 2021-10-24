@@ -1,9 +1,11 @@
 import k from "../kaboom";
 import { UNITS } from '../constants';
-import { COLORS, getColliderComps } from '../utils';
+import { COLORS, getColliderComps, addExplosion } from '../utils';
 import levels from '../levels';
 import { createPlayer, destroyPlayer, addPlayerColliders, registerPlayerActions } from '../entities/player';
 import { moverProps, kickableProps } from '../entities';
+import { addFlierParts } from '../entities/flier'; 
+import { addStanderParts } from '../entities/stander';
 import { registerCollisions } from '../events/collisions';
 import state, { resetLevelState, speedModifier } from '../state';
 import loadLevel from '../loadLevel';
@@ -178,6 +180,9 @@ k.scene("game", (args = {}) => {
 
     // throw arrow
     add([...throwArrowComps, follow(player)]);
+
+    addFlierParts();
+    addStanderParts();
   }
 
   startLevel(0);
@@ -248,6 +253,8 @@ k.scene("game", (args = {}) => {
     state.level.isSlowMo = false;
   }
   const throwBlade = () => {
+    const player = get("player")[0];
+    player.play("throwing");
     const throwArrow = get("throwArrow")[0];
     const bladePos = throwArrow.pos.add(dir(throwArrow.angle - 90).scale(BLADE_START_DISTANCE));
     add([
@@ -331,11 +338,15 @@ k.scene("game", (args = {}) => {
   const winLevel = () => {
     wait(1, () => {
       destroyAll("blade");
+      let delay = 0;
       every("enemy", enemy => {
-        addKaboom(enemy.pos);
-        enemy.destroy();
+        wait(delay, () => {
+          addExplosion(enemy.pos);
+          enemy.eye && enemy.eye.destroy();
+          enemy.destroy();
+        });
+        delay += 0.25;
       });
-      shake(20); // why not?
     });
  
     wait(2, () => {
@@ -397,7 +408,9 @@ k.scene("game", (args = {}) => {
     wait(1, () => {
       every("enemy", enemy => {
         if (!enemy.disabled && !state.level.isBossBattle) {
-          enemy.color = COLORS.RED;
+          if (enemy.eye) {
+            enemy.eye.frame = 8;
+          }
         }
       });
     });
@@ -460,7 +473,11 @@ k.scene("game", (args = {}) => {
     const player = get("player")[0];
 
     if (player.state === "prelaunch") {
-      launchArrow.opacity = state.level.isRecovering ? 0 : LAUNCH_ARROW_BOSS_BATTLE_OPACITY;
+      if (state.level.isRecovering) {
+        launchArrow.opacity = 0;
+      } else {
+        launchArrow.opacity = state.level.isBossBattle ? LAUNCH_ARROW_BOSS_BATTLE_OPACITY : 1;
+      }
 
       if (!state.level.isBossBattle) {
         if (launchArrow.angle <= LAUNCH_ARROW_MIN_ANGLE) {
@@ -510,6 +527,19 @@ k.scene("game", (args = {}) => {
 
     console.log(shakeable.direction)
     shakeable.moveBy(0, shakeable.direction * 0.5*UNITS);
+  });
+
+  action("animated", animated => {
+    animated.animSpeed = speedModifier();
+  });
+
+  action("eye", eye => {
+    const player = get("player")[0];
+    if (eye.disabled || (eye.owner && eye.owner.disabled)) {
+      eye.angle = 0;
+    } else {
+      eye.angle = eye.pos.angle(player.pos) + 90;
+    }
   });
 
   registerPlayerActions({ attemptReset });

@@ -8,9 +8,9 @@ import { START_JUMP_END_FRAME, LANDING_END_FRAME, FALLING_END_FRAME } from '../l
 const playerComps = [
   "player",
     sprite("player"),
-    scale(2, 2),
     z(5),
     area(),
+    rotate(),
     origin("center"),
     {
       ...moverProps,
@@ -61,6 +61,7 @@ export const registerPlayerActions = ({ attemptReset }) => {
     // I have to manage the animation transitions like this because onEnd()
     const curAnim = player.curAnim();
     if (player.isKicking) {
+      player.angle = 0;
       player.play("kicking", { loop: true })
     } else if (state.level.isRecovering) {
       player.play("landing")
@@ -71,7 +72,8 @@ export const registerPlayerActions = ({ attemptReset }) => {
     } else if (player.state === "launched" || player.state === "afterThrow") {
       if (player.isThrowing) {
         if (curAnim !== "throwing") {
-          player.play("throwing", { loop: true });
+          // player.play("throwing");
+          player.frame = 36;
         }
 
         const throwArrow = get("throwArrow")[0];
@@ -80,9 +82,9 @@ export const registerPlayerActions = ({ attemptReset }) => {
         if (curAnim === "crouch") {
           player.play("startJump", { speed: 10 });
         } else if (curAnim !== "somersault" && (curAnim !== "startJump" || player.frame >= START_JUMP_END_FRAME)) {
-          player.play("somersault", { loop: true });
+          player.frame = 32;
           player.flipX(false);
-          player.angle = 0;
+          player.angle += 20;
         } 
       }
     } else if (player.state === "landed" && player.frame !== LANDING_END_FRAME) {

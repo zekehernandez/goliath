@@ -1,5 +1,6 @@
 import k from '../kaboom';
 import { COLORS } from '../utils';
+import { UNITS } from '../constants';
 
 k.scene("gameOver", (args = {}) => {
   add([
@@ -12,14 +13,14 @@ k.scene("gameOver", (args = {}) => {
       "title",
       text("GAME OVER", { size: 60 }),
       origin("center"),
-      pos(center().x, center().y - 100),
+      pos(16*UNITS, center().y - 100),
   ]);
 
   const cta = add([
     "cta",
     text("Click to try again", { size: 30 }),
-    origin("center"),
-    pos(center().x, center().y + 50),
+    pos(31*UNITS, 17*UNITS),
+    origin("right"),
     opacity(0),
   ]);
 

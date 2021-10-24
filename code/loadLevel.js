@@ -3,6 +3,8 @@ import { COLORS, getColliderComps } from './utils';
 import { moverProps, kickableProps, tileComps } from './entities';
 import { createPlayer } from './entities/player';
 import { createBoss, createBossTarget } from './entities/boss';
+import { createFlier } from './entities/flier';
+import { createStander } from './entities/stander';
 
 const loadLevel = (level, launchId, landId) => {
   let shouldCreateBoss = false;
@@ -12,7 +14,7 @@ const loadLevel = (level, launchId, landId) => {
     width: 48,
     height: 48,
     // define what each symbol means, by a function returning a comp list (what you'll pass to add())
-    "@": () => createPlayer(),
+    "@": createPlayer,
     "!": () => { shouldCreateBoss = true },
     "?": () => createBossTarget(),
     "_": () => [...tileComps, "launch", sprite(`building${launchId}`, { frame: 0 })],
@@ -33,36 +35,8 @@ const loadLevel = (level, launchId, landId) => {
     "7": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 6 }), "wall"],
     "8": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 7 })],
     "9": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 6 })],
-    "x": () => [
-      "enemy",
-      "target",
-      "kickable",
-      rect(1*UNITS, 2*UNITS),
-      area(),
-      body(),
-      color(COLORS.GREEN),
-      origin("left"),
-      outline(),
-      {
-        disabled: false,
-        ...kickableProps,
-      },
-    ],
-    "o": () => [
-      "enemy",
-      "target",
-      "flier",
-      rect(1*UNITS, 1*UNITS),
-      area(),
-      solid(),
-      color(COLORS.GREEN),
-      origin("left"),
-      outline(),
-      {
-        disabled: false,
-        ...moverProps,
-      },
-    ],
+    "x": createStander,
+    "o": createFlier,
   });
 
   if (shouldCreateBoss) {
