@@ -1,6 +1,7 @@
 import k from '../kaboom';
 import { COLORS } from '../utils';
 import { UNITS } from '../constants';
+import state from '../state';
 
 k.scene("gameOver", (args = {}) => {
   add([
@@ -13,7 +14,19 @@ k.scene("gameOver", (args = {}) => {
       "title",
       text("GAME OVER", { size: 60 }),
       origin("center"),
-      pos(16*UNITS, center().y - 100),
+      pos(16*UNITS, 6*UNITS),
+  ]);
+
+  add([
+    text("Final Score:", { size: 40 }),
+    origin("center"),
+    pos(16*UNITS, 9*UNITS),
+  ]);
+  
+  add([
+    text(`${state.score}`, { size: 120 }),
+    origin("center"),
+    pos(16*UNITS, 11*UNITS),
   ]);
 
   const cta = add([
@@ -32,5 +45,5 @@ k.scene("gameOver", (args = {}) => {
     }
   });
 
-  mouseClick(() => k.go("game"))
+  mouseClick(() => k.go("game", { reset: true }))
 });

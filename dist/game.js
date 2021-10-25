@@ -2387,6 +2387,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     }, "loadBuilding");
     kaboom_default2.loadSprite("bean", "sprites/bean.png");
     kaboom_default2.loadSprite("arrow", "sprites/arrow.png");
+    kaboom_default2.loadSprite("kunai", "sprites/kunai.png");
     kaboom_default2.loadSprite("background", "sprites/background.png");
     kaboom_default2.loadSprite("title", "sprites/title.png");
     kaboom_default2.loadSprite("explosion", "sprites/explosion.png", {
@@ -2501,8 +2502,61 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     for (let i = 0; i < BUILDING_COUNT; i++) {
       loadBuilding(i);
     }
+    kaboom_default2.loadSound("bigHit", "sounds/title.wav");
+    kaboom_default2.loadSound("intro", "sounds/intro.wav");
+    kaboom_default2.loadSound("explosion", "sounds/explosion.wav");
+    kaboom_default2.loadSound("bossDeath", "sounds/boss_death.wav");
+    kaboom_default2.loadSound("disabledFlier", "sounds/disabled-flier.wav");
+    kaboom_default2.loadSound("disabledTallbot", "sounds/disabled-tallbot.wav");
+    kaboom_default2.loadSound("mainGame", "sounds/main_game.mp3");
+    kaboom_default2.loadSound("bossMoving", "sounds/moving.wav");
+    kaboom_default2.loadSound("rising", "sounds/rising.wav");
+    kaboom_default2.loadSound("hit", "sounds/hit.wav");
+    kaboom_default2.loadSound("handRaise", "sounds/hit.wav");
+    kaboom_default2.loadSound("charging", "sounds/charging.wav");
+    kaboom_default2.loadSound("laser", "sounds/laser.wav");
   }, "loadAssets");
   var loadAssets_default = loadAssets;
+
+  // code/state.js
+  var SCORES = {
+    SUCCESS: { text: "Cleared Rooftop", value: 500 },
+    FALL: { text: "Fall", value: -40 },
+    MISS: { text: "Kunai Miss", value: -20 },
+    KUNAI_HIT: { text: "Kunai Hit", value: 200 },
+    KICK: { text: "Good Kick", value: 180 },
+    BOSS_SUCCESS: { text: "You Won", value: 1e3 }
+  };
+  var defaultLevel = {
+    isWon: false,
+    isSlowMo: false,
+    isBossBattle: false,
+    isRecovering: false,
+    ammoCount: 6,
+    energyCount: 3
+  };
+  var state = {
+    level: __spreadValues({}, defaultLevel),
+    currentBuilding: -1,
+    isPaused: false,
+    pastConversations: new Set(),
+    conversationQueue: [],
+    currentLevel: 0,
+    score: 1e3
+  };
+  var softReset = /* @__PURE__ */ __name(() => {
+    state.score = 1e3;
+    state.currentLevel = 0;
+    state.conversationQueue = [];
+    state.currentBuilding = -1;
+    state.isPaused = false;
+  }, "softReset");
+  var resetLevelState = /* @__PURE__ */ __name(() => {
+    state.level = __spreadValues({}, defaultLevel);
+  }, "resetLevelState");
+  var SLOW_MO_MODIFIER = 0.045;
+  var speedModifier = /* @__PURE__ */ __name(() => state.level.isSlowMo ? SLOW_MO_MODIFIER : 1, "speedModifier");
+  var state_default = state;
 
   // code/utils.js
   var isDebugging = false;
@@ -2513,7 +2567,10 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     DARK_GREY: rgb(65, 75, 74),
     RED: rgb(240, 50, 50),
     GREEN: rgb(60, 230, 110),
-    PURPLE: rgb(200, 100, 200)
+    PURPLE: rgb(200, 100, 200),
+    DARK_BLUE: rgb(48, 74, 78),
+    MED_BLUE: rgb(121, 186, 195),
+    LIGHT_BLUE: rgb(145, 223, 234)
   };
   var getColliderComps = /* @__PURE__ */ __name((colliderColor) => [
     color(colliderColor),
@@ -2542,6 +2599,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       origin("center"),
       z(4)
     ]);
+    play("explosion");
     explosion.play("main", { onEnd: () => {
       explosion.destroy();
     } });
@@ -2549,9 +2607,88 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       shake(20);
     });
   }, "addExplosion");
+  var addFade = /* @__PURE__ */ __name((fadeIn, onEnd) => {
+    let multiplier = 1;
+    const fade = add([
+      "fadeIn",
+      rect(32 * UNITS, 18 * UNITS),
+      pos(0, 0),
+      color(COLORS.BLACK),
+      layer("ui"),
+      z(1e3),
+      opacity(fadeIn ? 1 : 0)
+    ]);
+    fade.action(() => {
+      fade.opacity -= (fadeIn ? 1e-3 : -1e-3) * multiplier;
+      multiplier += 0.25;
+      if (fadeIn && fade.opacity <= 0 || fade.opacity >= 1) {
+        fade.destroy();
+        onEnd && onEnd();
+      }
+    });
+  }, "addFade");
+  var addScore = /* @__PURE__ */ __name((scoreToAdd) => {
+    state_default.score += scoreToAdd.value;
+    const scoreCounter = get("scoreCounter")[0];
+    if (scoreCounter) {
+      scoreCounter.text = `SCORE: ${state_default.score}`;
+    }
+    const scoreText = get("scoreText")[0];
+    if (scoreText) {
+      const isPositive = scoreToAdd.value > 0;
+      scoreText.text = `${scoreToAdd.text}   ${isPositive ? "+" : ""}${scoreToAdd.value}`;
+      if (isPositive) {
+        scoreText.color = COLORS.LIGHT_BLUE;
+      } else {
+        scoreText.color = COLORS.RED;
+      }
+      scoreText.opacity = 1;
+      scoreText.timer = 5 * 60;
+    }
+  }, "addScore");
 
   // code/levels.js
   var levels_default = [
+    [
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "              0TTTTTTTTTTT      ",
+      " @            123232323232      ",
+      "__            456565656565      ",
+      "AB            789898989898      "
+    ],
+    [
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "               x                ",
+      "              0TTTTTTTTTTT      ",
+      "              123232323232      ",
+      " @            456565656565      ",
+      "__            789898989898      "
+    ],
     [
       "                                ",
       "                                ",
@@ -2587,30 +2724,10 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       "EF                      x       ",
       "AB              0TTTTTTTTT      ",
       "CD              1232323232      ",
-      "EF              4565656565      ",
+      "EF          x   4565656565      ",
       "AB      0TTTTTTT9898989898      ",
       "CD      123232323232323232      ",
       "EF      456565656565656565      "
-    ],
-    [
-      "                                ",
-      "                                ",
-      "                                ",
-      "                                ",
-      "                                ",
-      "                                ",
-      "                                ",
-      "                                ",
-      "                                ",
-      "                                ",
-      "                                ",
-      "                                ",
-      "                                ",
-      "               x                ",
-      "              0TTTTTTTTTTT      ",
-      "              123232323232      ",
-      " @            456565656565      ",
-      "__            789898989898      "
     ],
     [
       "                                ",
@@ -2639,6 +2756,85 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       "                                ",
       "                                ",
       "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      " @                              ",
+      "__                              ",
+      "AB            o                 ",
+      "CD                              ",
+      "EF                             ",
+      "AB      0TTTTTTTTT              ",
+      "CD      1232323232              ",
+      "EF      4565656565   x          ",
+      "AB      0TTTTTTT9898989898      ",
+      "CD      123232323232323232      ",
+      "EF      456565656565656565      "
+    ],
+    [
+      "                                ",
+      "           o                    ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                           o    ",
+      "                                ",
+      "              o                 ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      " @                              ",
+      "__                              ",
+      "AB    0TTTTTTTTTTTTTTTTTTTTTTT  ",
+      "CD    123232323232323232323232  ",
+      "EF    456565656565656565656565  "
+    ],
+    [
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                          o     ",
+      "                                ",
+      "                                ",
+      "          o                      ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                        x       ",
+      "                 0TTTTTTTTT     ",
+      "                 1232323232     ",
+      " @               4565656565     ",
+      "__               7898989898     "
+    ],
+    [
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                          o     ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      " @                              ",
+      "__                              ",
+      "AB                              ",
+      "CD                              ",
+      "EF      x         x             ",
+      "AB   0TTTTTTTTTTTTTTTTTTTTTT    ",
+      "CD   12323232323232323232323    ",
+      "EF   45656565656565656565656    ",
+      "AB   78989898989898989898989    ",
+      "CD   12323232323232323232323    "
+    ],
+    [
+      "                                ",
       "                 ?              ",
       "            ?                   ",
       "         ?            ?         ",
@@ -2652,8 +2848,31 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       "                @               ",
       "    0TTTTTTTTTTTTTTTTTTTTTTT    ",
       "    123232323232323232323232    ",
+      "    456565656565656565656565    ",
+      "    789898989898989898989898    ",
+      "    123232323232323232323232    ",
       "    456565656565656565656565    "
     ]
+  ];
+  var cinematicLevel = [
+    "                                ",
+    "                                ",
+    "                                ",
+    "                                ",
+    "                                ",
+    "                                ",
+    "                                ",
+    "                                ",
+    "                                ",
+    "                                ",
+    "                $               ",
+    "                @               ",
+    "    0TTTTTTTTTTTTTTTTTTTTTTT    ",
+    "    123232323232323232323232    ",
+    "    456565656565656565656565    ",
+    "    789898989898989898989898    ",
+    "    123232323232323232323232    ",
+    "    456565656565656565656565    "
   ];
 
   // code/entities/index.js
@@ -2676,26 +2895,250 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     direction: -1
   };
 
-  // code/state.js
-  var defaultLevel = {
-    isWon: false,
-    isSlowMo: false,
-    ammoRecovered: 0,
-    misses: 0,
-    isBossBattle: false,
-    isRecovering: false
+  // code/conversations.js
+  var conversations = {
+    "intro": [
+      { speaker: 1, text: "We have a problem." },
+      { speaker: 0, text: "What kind of problem?" },
+      { speaker: 1, text: "A huge problem." },
+      { speaker: 0, text: "He's back?" },
+      { speaker: 1, text: "He's back." },
+      { speaker: 0, text: "We all knew this day would come." },
+      { speaker: 1, text: "Sooner than I would have hoped for." },
+      { speaker: 1, text: "Once you get in, Dr. Drauxbahtz has some new gear for you. I think you'll find it useful." },
+      { speaker: 0, text: "I've been preparing for this day. I'll be right over." },
+      { speaker: 1, text: "We'll get him this time." }
+    ],
+    "firstLevel": [
+      { speaker: 2, text: "Alright, let's test the waters. Your stealth exoskeleton greatly expands upon your current abilities." },
+      { speaker: 2, text: "You should be able to jump much farther and higher than any normal human can." },
+      { speaker: 0, text: "Sounds great." },
+      { speaker: 0, text: "So, how do I work this thing?" },
+      { speaker: 2, text: "See that big arrow on your HUD? When it points to the direction you want to jump [CLICK & HOLD]." },
+      { speaker: 2, text: "While you [CLICK & HOLD] that big arrow will grow, indicating how strong your jump will be." },
+      { speaker: 2, text: "Once the you feel your jump is strong enough [RELEASE CLICK] to jump. Easy peasy." },
+      { speaker: 0, text: "Easy peasy, right. I'll give it a shot. Thanks for the upgrades, Dr. Drauxbahtz." },
+      { speaker: 2, text: "You got it! And please, you can call me Hugh." }
+    ],
+    "firstStander": [
+      { speaker: 0, text: "What is THAT thing?" },
+      { speaker: 2, text: "I guess I don't know really what it is, but we've been calling them tallbots. On account of them being tall." },
+      { speaker: 0, text: "I see." },
+      { speaker: 2, text: "Well, this is the perfect opportunity to test out how your exoskeleton enhances your kick strength." },
+      { speaker: 0, text: "I like the sound of that." },
+      { speaker: 2, text: "Just jump to it and let your suit do the rest." }
+    ],
+    "firstFlier": [
+      { speaker: 0, text: "Okay, now what about this guy?" },
+      { speaker: 2, text: "We call those fliers, on account of them--" },
+      { speaker: 0, text: "Yeah, I get it." },
+      { speaker: 0, text: "I'm gonna kick it." },
+      { speaker: 2, text: "You actually can't kick these." },
+      { speaker: 0, text: "Why not?" },
+      { speaker: 2, text: "[PHYSICS EXPLANATION]" },
+      { speaker: 0, text: "Makes perfect sense." },
+      { speaker: 2, text: "Not to worry, I have another tool for you to try: Energy kunai." },
+      { speaker: 0, text: "Keep going." },
+      { speaker: 2, text: "Here's how it works, while you are in the air [CLICK] to enter a targeting mode." },
+      { speaker: 2, text: "You'll see a targeting arrow on your HUD. When it is pointing at a target [CLICK] to throw an energy kunai." },
+      { speaker: 2, text: "The kunai will work on the tallbots as well." },
+      { speaker: 0, text: "Excellent." },
+      { speaker: 2, text: "Oh, and in a single jump you can throw as many kunai as you have charged up" }
+    ],
+    "checkIn": [
+      { speaker: 1, text: "You're doing a great job cleaning up the city. Keep up the good work." },
+      { speaker: 0, text: "It's got to be done" }
+    ],
+    "teleport": [
+      { speaker: 0, text: "Uhh, what just happened?" },
+      { speaker: 2, text: "Haha, it worked!" },
+      { speaker: 0, text: 'And what is "it" exactly?' },
+      { speaker: 2, text: "I added an emergency teleportation system. It returns you to a place of safety when it detects you are in imminent mortal danger." },
+      { speaker: 0, text: "I guess I owe you one." },
+      { speaker: 2, text: "Before you get too excited, you should know that this teleportation system uses a LOT of energy. You can only use it a limited number of times before it needs to recharge." },
+      { speaker: 0, text: "So if this uses energy, does using have a negative impact on the weaponry in this thing?" },
+      { speaker: 2, text: "Good question, and nope!" },
+      { speaker: 0, text: "It seems like it would though." },
+      { speaker: 2, text: "[A GENERIC HAND-WAVY REASON]" },
+      { speaker: 0, text: "Uh huh..." }
+    ],
+    "bossCinematic1": [
+      { speaker: 1, text: "How's everything going? Have you seen him yet?" },
+      { speaker: 0, text: "No, not yet. But I'm ready." },
+      { speaker: 1, text: "You should be proud of the work you've done tonight. Things have certainly quieted down a bit." },
+      { speaker: 0, text: "Yeah... things are quiet..." },
+      { speaker: 0, text: "...too quiet." }
+    ],
+    "bossCinematic2": [
+      { speaker: 0, text: "What was that?!" }
+    ],
+    "bossCinematic3": [
+      { speaker: 0, text: "Oh boy." }
+    ],
+    "bossCinematic4": [
+      { speaker: 0, text: "Hey boss." },
+      { speaker: 0, text: "I found him." },
+      { speaker: 1, text: "You did?! Godspeed, my friend." },
+      { speaker: 2, text: "Just one thing! We in the scientific community, know very little about him, but based on some of the models we ran--" },
+      { speaker: 0, text: "Please get to the point." },
+      { speaker: 2, text: "Right, sorry. His only apparent weakness appears to be his EYE." },
+      { speaker: 2, text: "His EYE." },
+      { speaker: 0, text: "Weak point, eye. Got it." },
+      { speaker: 2, text: "Oh, but only while he's charging or shooting that laser! Good luck!" },
+      { speaker: 0, text: "LASER?! Nobody said anything about a laser!" },
+      { speaker: 0, text: "Hugh." },
+      { speaker: 0, text: "Hugh?" },
+      { speaker: 0, text: "HUGH!!!!" }
+    ],
+    "death": [
+      { speaker: 0, text: "Uh oh." },
+      { speaker: 3, text: "NOOOOOOOOOO!!!!!!" }
+    ]
   };
-  var state = {
-    level: __spreadValues({}, defaultLevel),
-    health: 3,
-    currentBuilding: -1
-  };
-  var resetLevelState = /* @__PURE__ */ __name(() => {
-    state.level = __spreadValues({}, defaultLevel);
-  }, "resetLevelState");
-  var SLOW_MO_MODIFIER = 0.045;
-  var speedModifier = /* @__PURE__ */ __name(() => state.level.isSlowMo ? SLOW_MO_MODIFIER : 1, "speedModifier");
-  var state_default = state;
+  var conversations_default = conversations;
+
+  // code/entities/text.js
+  var SPEAKERS = [
+    "",
+    "LT. STEEL",
+    "DR. DRAUXBAHTZ",
+    "LT. STEEL & DR. DRAUXBAHTZ IN UNISON"
+  ];
+  var addActiveText = /* @__PURE__ */ __name((body2, otherComps, textOptions) => {
+    var _a;
+    const width2 = (_a = textOptions.width) != null ? _a : 30 * UNITS;
+    add([
+      text("", __spreadProps(__spreadValues({}, textOptions), { width: width2 })),
+      "activeText",
+      ...otherComps,
+      {
+        phase: 0,
+        body: body2
+      }
+    ]);
+  }, "addActiveText");
+  var registerTextActions = /* @__PURE__ */ __name(() => {
+    action("activeText", (activeText) => {
+      if (activeText.phase === 0) {
+        if (activeText.text.length < activeText.body.length) {
+        }
+        activeText.text = activeText.text + activeText.body.charAt(activeText.text.length);
+      }
+    });
+  }, "registerTextActions");
+  var addConversation = /* @__PURE__ */ __name((conversationKey, pause = 1, onEnd = () => {
+  }, hideOverlay = false) => {
+    console.log("conversationKey", conversationKey);
+    if (state_default.pastConversations.has(conversationKey)) {
+      onEnd && onEnd();
+      return;
+    } else {
+      if (state_default.conversationQueue.length > 0) {
+        state_default.conversationQueue.push({ conversationKey, pause, onEnd, hideOverlay });
+        return;
+      }
+      state_default.pastConversations.add(conversationKey);
+      state_default.conversationQueue.push({ conversationKey, pause, onEnd, hideOverlay });
+    }
+    state_default.isPaused = true;
+    wait(pause, () => {
+      const panelHeight = 4 * UNITS;
+      const conversation = conversations_default[conversationKey];
+      if (!conversation) {
+        console.log("no conversation found for ", conversationKey);
+        state_default.isPaused = false;
+        return;
+      }
+      let index = 0;
+      if (!hideOverlay) {
+        add([
+          "conversationOverlay",
+          rect(32 * UNITS, 18 * UNITS),
+          color(COLORS.BLACK),
+          opacity(0.75),
+          layer("ui")
+        ]);
+      }
+      const conversationPanel = add([
+        "conversationPanel",
+        rect(28 * UNITS, panelHeight),
+        pos(2 * UNITS, 18 * UNITS - panelHeight),
+        outline(4, COLORS.LIGHT_BLUE),
+        color(COLORS.DARK_BLUE),
+        z(100),
+        {
+          index,
+          needsToProgress: true
+        },
+        layer("ui")
+      ]);
+      const cta = add([
+        "conversationCta",
+        text("Click to progress", { size: 22 }),
+        pos(conversationPanel.pos.add(conversationPanel.width - 1 * UNITS, 3.5 * UNITS)),
+        color(COLORS.MED_BLUE),
+        origin("right"),
+        opacity(0),
+        z(100)
+      ]);
+      conversationPanel.action(() => {
+        if (conversationPanel.needsToProgress) {
+          conversationPanel.needsToProgress = false;
+          destroyAll("activeSpeaker");
+          destroyAll("activeStatement");
+          if (index >= conversation.length) {
+            destroyAll("conversationOverlay");
+            conversationPanel.destroy();
+            cta.destroy();
+            state_default.isPaused = false;
+            onEnd && onEnd();
+            state_default.conversationQueue.shift();
+            if (state_default.conversationQueue.length > 0) {
+              console.log("here?");
+              const newConversation = state_default.conversationQueue.shift();
+              addConversation(newConversation.conversationKey, newConversation.pause, newConversation.onEnd, newConversation.hideOverlay);
+            }
+            return;
+          }
+          const statement = conversation[index];
+          const speakerName = add([
+            "activeSpeaker",
+            text(SPEAKERS[statement.speaker], { size: 28 }),
+            pos(conversationPanel.pos.add(0.5 * UNITS, 0.5 * UNITS)),
+            outline(1, COLORS.MED_BLUE),
+            z(100),
+            color(COLORS.LIGHT_BLUE),
+            layer("ui")
+          ]);
+          addActiveText(statement.text, [
+            "activeStatement",
+            color(COLORS.MED_BLUE),
+            pos(speakerName.pos.add(0, 1 * UNITS)),
+            layer("ui"),
+            z(100)
+          ], {
+            size: 24,
+            width: 26 * UNITS
+          });
+          index++;
+        }
+        const activeStatement = get("activeStatement")[0];
+        if (activeStatement && activeStatement.text.length === activeStatement.body.length) {
+          wait(0.5, () => {
+            cta.opacity = 1;
+          });
+        } else {
+          cta.opacity = 0;
+        }
+      });
+    });
+    mouseClick(() => {
+      const conversationPanels = get("conversationPanel");
+      if (conversationPanels.length > 0) {
+        conversationPanels[0].needsToProgress = true;
+      }
+    });
+  }, "addConversation");
 
   // code/entities/player.js
   var playerComps = [
@@ -2738,16 +3181,16 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
   }, "addPlayerColliders");
   var registerPlayerActions = /* @__PURE__ */ __name(({ attemptReset }) => {
     action("player", (player) => {
-      console.log(`state: ${player.state}, isThrowing: ${player.isThrowing}, isRecovering: ${state_default.level.isRecovering}`);
       if (player.pos.x > width() + 2 * UNITS || player.pos.y > height() + 2 * UNITS) {
-        attemptReset();
+        shake(10);
+        attemptReset(true);
       }
       const curAnim = player.curAnim();
       if (player.isKicking) {
         player.angle = 0;
         player.play("kicking", { loop: true });
       } else if (state_default.level.isRecovering) {
-        player.play("landing");
+        player.frame = LANDING_END_FRAME;
       } else if (player.state === "prelaunch" && curAnim !== "idle") {
         player.play("idle", { loop: true, speed: 4 });
       } else if (player.state === "launching" && curAnim !== "crouch") {
@@ -2774,7 +3217,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
           player.flipX(false);
           player.angle = 0;
         }
-      } else if (curAnim !== "idle" && (get("target").length === 0 || state_default.level.isWon === true)) {
+      } else if (player.state === "landed" && curAnim !== "idle" && (get("target").length === 0 || state_default.level.isWon === true)) {
         player.play("idle", { loop: true, speed: 4 });
       }
     });
@@ -2807,7 +3250,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       const flierHurtbox = add([
         "flierHurtbox",
         "enemyHurtbox",
-        rect(1 * UNITS, 1.5 * UNITS),
+        rect(1 * UNITS, 1.25 * UNITS),
         pos(flier.pos),
         area(),
         origin("center"),
@@ -2853,7 +3296,6 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         }
         const distanceFromStart = Math.abs(flier.startingHeight - flier.pos.y);
         const speed = Math.abs(HOVER_DISTANCE - distanceFromStart);
-        console.log(speed);
         flier.pos.y = flier.pos.y + direction * (1 + speed / 64) * speedModifier();
       }
     });
@@ -2916,12 +3358,6 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
 
   // code/events/collisions.js
   var registerCollisions = /* @__PURE__ */ __name(({ endThrow, checkEnd }) => {
-    const attemptAmmoRecover = /* @__PURE__ */ __name((blade) => {
-      if (!blade.isRecovered) {
-        state_default.level.ammoRecovered++;
-        blade.isRecovered = true;
-      }
-    }, "attemptAmmoRecover");
     collides("landCollider", "land", (collider) => {
       collider.owner.unuse("mover");
       collider.owner.sideSpeed = 0;
@@ -2949,10 +3385,11 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       const wasPreviouslyDisabled = enemy.disabled;
       blade.speed = 0;
       enemy.disabled = true;
+      addScore(SCORES.KUNAI_HIT);
       enemy.play("disabled", { loop: true });
+      play("hit");
       enemy.eye && enemy.eye.play("disabled");
       enemy.thruster && enemy.thruster.destroy();
-      attemptAmmoRecover(blade);
       shake(5);
       if (!wasPreviouslyDisabled) {
         checkEnd();
@@ -2962,15 +3399,15 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       const flier = flierHurtbox.owner;
       flier.use("mover");
       blade.use(follow(flier, blade.pos.sub(flier.pos)));
-      attemptAmmoRecover(blade);
       const direction = dir(blade.throwAngle).scale(4);
       flier.sideSpeed = direction.x;
       flier.upSpeed = -direction.y;
     });
     collides("blade", "land", (blade) => {
-      blade.speed = 0;
-      attemptAmmoRecover(blade);
-      state_default.level.misses++;
+      if (blade.speed !== 0) {
+        addScore(SCORES.MISS);
+        blade.speed = 0;
+      }
       checkEnd();
     });
     collides("player", "flierHurtbox", (player, flierHurtbox) => {
@@ -2986,6 +3423,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         player.isKicking = true;
         state_default.level.isSlowMo = true;
         kickable.disabled = true;
+        addScore(SCORES.KICK);
         kickable.color = COLORS.GREY;
         const kickDirection = player.pos.sub(kickable.pos).x;
         if (kickable.curAnim() !== "kicked" && kickDirection - 1) {
@@ -3019,6 +3457,8 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     let acceleration = 0;
     let stepsTilNextPhase = Math.floor(rand(MIN_STEPS, MAX_STEPS));
     let inPhase;
+    let laserSound;
+    let chargingSound;
     const bossHead = add([
       "bossHead",
       sprite("bossHead"),
@@ -3147,6 +3587,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       searchingForTarget = true;
       wait(rand(0.5, 3) + MIN_TARGET_SEARCH_TIME, () => {
         searchingForTarget = false;
+        play("bossMoving");
         bossTarget = choose(bossTargets);
       });
     }, "searchForTarget");
@@ -3160,6 +3601,12 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       bossEye.shootTimer = SHOOTING_TIME;
       stepsTilNextPhase = Math.floor(rand(MIN_STEPS, MAX_STEPS));
       inPhase = false;
+      if (laserSound) {
+        laserSound.stop();
+      }
+      if (chargingSound) {
+        chargingSound.stop();
+      }
     }, "endPhase");
     const startNewPhase = /* @__PURE__ */ __name(() => {
       inPhase = true;
@@ -3197,6 +3644,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       const curAnim = bossEye.curAnim();
       if (bossEye.isCharging) {
         if (curAnim !== "charging") {
+          chargingSound = play("charging");
           bossEye.play("charging", { loop: true, pingpong: true });
         } else {
           bossEye.chargeTimer -= 1 * speedModifier();
@@ -3211,6 +3659,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         }
       } else if (bossEye.isShooting) {
         if (curAnim !== "shooting") {
+          laserSound = play("laser");
           bossEye.play("shooting", { loop: true, pingpong: true });
         } else {
           bossEye.shootTimer -= 1 * speedModifier();
@@ -3243,9 +3692,11 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       if (bossEye2.isCharging || bossEye2.isShooting) {
         shake(10);
         bossEye2.health--;
+        play("hit");
         endPhase();
         if (bossEye2.health <= 0) {
           bossEye2.disabled = true;
+          addScore(SCORES.BOSS_SUCCESS);
         } else {
           wait(1, () => {
             slam();
@@ -3263,14 +3714,15 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     collides("bossLaserCollider", "player", (bossLaserCollider, player) => {
       console.log("here");
       if (bossEye.isShooting && !state_default.level.isRecovering) {
-        state_default.health--;
-        if (state_default.health <= 0) {
+        state_default.level.energyCount--;
+        if (state_default.energyCount <= 0) {
           wait(2, () => {
-            go("gameOver");
+            go("continue");
           });
         }
         state_default.level.isRecovering = true;
-        wait(5, () => {
+        player.angle = 0;
+        wait(3, () => {
           state_default.level.isRecovering = false;
         });
       }
@@ -3325,8 +3777,6 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
 
   // code/scenes/game.js
   var GRAVITY = 0.2;
-  var STARTING_AMMO_COUNT = 5;
-  var STARTING_SMOKE_BOMB_COUNT = 3;
   var WALL_COLLIDER_THICKNESS = 16;
   var LAUNCH_ARROW_SPEED = 0.75;
   var LAUNCH_ARROW_MIN_ANGLE = 0;
@@ -3360,19 +3810,21 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     layer("ui")
   ];
   kaboom_default2.scene("game", (args = {}) => {
+    var _a;
+    if (args.reset) {
+      softReset();
+    }
+    play("mainGame", { loop: true });
+    const startingLevel = (_a = args.level) != null ? _a : state_default.currentLevel;
     resetLevelState();
-    let currentLevel;
-    let ammoCount = STARTING_AMMO_COUNT;
-    let smokeBombCount = STARTING_SMOKE_BOMB_COUNT;
     let previousMouseDown;
-    let misses;
     let launchArrow;
     let overlay2;
     let ammoCounter;
-    let smokeBombCounter;
+    let energyCounter;
     let startingPosition;
-    const getAmmoCounterText = /* @__PURE__ */ __name(() => `Ammo: ${ammoCount}`, "getAmmoCounterText");
-    const getSmokeBombCounterText = /* @__PURE__ */ __name(() => `Smoke Bombs: ${smokeBombCount}`, "getSmokeBombCounterText");
+    const getAmmoCounterText = /* @__PURE__ */ __name(() => `Kunai: ${state_default.level.ammoCount}`, "getAmmoCounterText");
+    const getEnergyCounterText = /* @__PURE__ */ __name(() => `Energy: ${state_default.level.energyCount}`, "getEnergyCounterText");
     layers([
       "bg",
       "game",
@@ -3382,26 +3834,41 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       kaboom_default2.every((obj) => obj.destroy());
       state_default.currentBuilding = (state_default.currentBuilding + 1) % 3;
       const nextBuilding = (state_default.currentBuilding + 1) % 3;
-      ammoCount += state_default.level.ammoRecovered;
+      state_default.currentLevel = newLevel;
+      resetLevelState();
+      previousMouseDown = mouseIsDown();
+      add([
+        "scoreCounter",
+        text(`SCORE: ${state_default.score}`, { width: 30 * UNITS, size: 24 }),
+        pos(31 * UNITS, 1 * UNITS),
+        origin("topright"),
+        layer("ui"),
+        z(100),
+        color(COLORS.WHITE)
+      ]);
+      add([
+        "scoreText",
+        text("", { width: 30 * UNITS, size: 20 }),
+        pos(31 * UNITS, 2 * UNITS),
+        origin("topright"),
+        layer("ui"),
+        z(100),
+        color(COLORS.WHITE)
+      ]);
+      energyCounter = add([
+        "smokeBombsCounter",
+        text(getEnergyCounterText(), { size: 24 }),
+        pos(1 * UNITS, 1 * UNITS),
+        layer("ui"),
+        color(state_default.level.energyCount > 0 ? COLORS.WHITE : COLORS.RED)
+      ]);
       ammoCounter = add([
         "ammoCounter",
         text(getAmmoCounterText(), { size: 24 }),
-        pos(1 * UNITS, 1 * UNITS),
-        layer("ui"),
-        color(ammoCount > 0 ? COLORS.WHITE : COLORS.RED)
-      ]);
-      smokeBombCounter = add([
-        "smokeBombsCounter",
-        text(getSmokeBombCounterText(), { size: 24 }),
         pos(1 * UNITS, 2 * UNITS),
         layer("ui"),
-        color(smokeBombCount > 0 ? COLORS.WHITE : COLORS.RED)
+        color(state_default.level.ammoCount > 0 ? COLORS.WHITE : COLORS.RED)
       ]);
-      currentLevel = newLevel;
-      resetLevelState();
-      previousMouseDown = mouseIsDown();
-      state_default.level.ammoRecovered = 0;
-      misses = 0;
       add([
         "sky",
         sprite("background"),
@@ -3421,7 +3888,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
           overlay2.opacity = 0.25;
         }
       });
-      loadLevel_default(levels_default[currentLevel], state_default.currentBuilding, nextBuilding);
+      loadLevel_default(levels_default[state_default.currentLevel], state_default.currentBuilding, nextBuilding);
       state_default.level.isBossBattle = get("bossEye").length > 0;
       const player = get("player")[0];
       addPlayerColliders(player);
@@ -3457,12 +3924,34 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       add([...throwArrowComps, follow(player)]);
       addFlierParts();
       addStanderParts();
+      if (state_default.currentLevel === 0) {
+        addConversation("firstLevel", 1, () => {
+          previousMouseDown = mouseIsDown();
+        });
+      }
+      if (get("stander").length > 0) {
+        addConversation("firstStander", 1, () => {
+          previousMouseDown = mouseIsDown();
+        });
+      }
+      if (get("flier").length > 0) {
+        addConversation("firstFlier", 1, () => {
+          previosMouseDown = mouseIsDown();
+        });
+      }
+      if (state_default.currentLevel === 3) {
+        addConversation("checkIn", 1, () => {
+          previousMouseDown = mouseIsDown();
+        });
+      }
     }, "startLevel");
-    startLevel(0);
+    startLevel(startingLevel);
     const reset = /* @__PURE__ */ __name(() => {
+      addConversation("teleport", 0.5, () => {
+        previousMouseDown = mouseIsDown();
+      });
       useSmokeBomb();
       destroyPlayer();
-      console.trace("hwhy");
       destroyAll("throwArrow");
       launchArrow.destroy();
       state_default.level.isSlowMo = false;
@@ -3472,28 +3961,37 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       launchArrow = add([...launchArrowComps, pos(startingPosition)]);
       add([...throwArrowComps, follow(player)]);
     }, "reset");
-    const attemptReset = /* @__PURE__ */ __name(() => {
-      if (smokeBombCount > 0) {
+    const attemptReset = /* @__PURE__ */ __name((fromFalling) => {
+      if (fromFalling) {
+        addScore(SCORES.FALL);
+      }
+      if (state_default.level.energyCount > 0) {
         reset();
       } else {
-        go("gameOver");
+        destroyPlayer();
+        destroyAll("throwArrow");
+        launchArrow.destroy();
+        addConversation("death", 0, () => {
+          previousMouseDown = mouseIsDown();
+          go("continue");
+        });
       }
     }, "attemptReset");
     const flashAmmo = /* @__PURE__ */ __name(() => {
       shake(1);
     }, "flashAmmo");
     const useAmmo = /* @__PURE__ */ __name(() => {
-      ammoCount -= 1;
+      state_default.level.ammoCount -= 1;
       ammoCounter.text = getAmmoCounterText();
-      if (ammoCount === 0) {
+      if (state_default.level.ammoCount === 0) {
         ammoCounter.color = COLORS.RED;
       }
     }, "useAmmo");
     const useSmokeBomb = /* @__PURE__ */ __name(() => {
-      smokeBombCount -= 1;
-      smokeBombCounter.text = getSmokeBombCounterText();
-      if (smokeBombCount === 0) {
-        smokeBombCounter.color = COLORS.RED;
+      state_default.level.energyCount -= 1;
+      energyCounter.text = getEnergyCounterText();
+      if (state_default.level.energyCount === 0) {
+        energyCounter.color = COLORS.RED;
       }
     }, "useSmokeBomb");
     const startThrow = /* @__PURE__ */ __name(() => {
@@ -3519,9 +4017,12 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       const bladePos = throwArrow.pos.add(dir(throwArrow.angle - 90).scale(BLADE_START_DISTANCE));
       add([
         "blade",
-        rect(10, 10),
+        sprite("kunai"),
         area(),
         pos(bladePos),
+        scale(0.3),
+        rotate(throwArrow.angle),
+        origin("center"),
         z(5),
         __spreadValues({
           speed: BLADE_SPEED,
@@ -3532,16 +4033,19 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       useAmmo();
     }, "throwBlade");
     const gameAction = /* @__PURE__ */ __name(() => {
+      if (state_default.isPaused) {
+        return;
+      }
       const player = get("player")[0];
       if (player.state === "launched" && !player.isThrowing && !player.isKicking && !state_default.level.isRecovering) {
-        ammoCount > 0 ? startThrow() : flashAmmo();
+        state_default.level.ammoCount > 0 ? startThrow() : flashAmmo();
       } else if (player.isThrowing) {
-        ammoCount > 0 ? throwBlade() : flashAmmo();
+        state_default.level.ammoCount > 0 ? throwBlade() : flashAmmo();
       } else if (state_default.level.isWon) {
-        if (currentLevel + 1 === levels_default.length) {
+        if (state_default.currentLevel + 1 === levels_default.length) {
           go("win");
         } else {
-          startLevel(currentLevel + 1);
+          startLevel(state_default.currentLevel + 1);
         }
       }
     }, "gameAction");
@@ -3565,11 +4069,17 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       }
     }, "actionUp");
     const doMouseDown = /* @__PURE__ */ __name(() => {
+      if (state_default.isPaused) {
+        return;
+      }
       if (!previousMouseDown) {
         actionDown();
       }
     }, "doMouseDown");
     const doMouseUp = /* @__PURE__ */ __name(() => {
+      if (state_default.isPaused) {
+        return;
+      }
       if (previousMouseDown) {
         previousMouseDown = false;
       } else {
@@ -3579,10 +4089,11 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     mouseDown(doMouseDown);
     mouseRelease(doMouseUp);
     mouseClick(gameAction);
-    keyDown("space", actionDown);
-    keyRelease("space", actionUp);
-    keyPress("space", gameAction);
-    keyPress("tab", () => startLevel(currentLevel));
+    keyPress("tab", () => {
+      if (isDebugging) {
+        startLevel((state_default.currentLevel + 1) % levels_default.length);
+      }
+    });
     const winLevel = /* @__PURE__ */ __name(() => {
       wait(1, () => {
         destroyAll("blade");
@@ -3600,48 +4111,29 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         const stats = add([
           rect(10 * UNITS, 6 * UNITS),
           area(),
-          color(COLORS.BLACK),
+          color(COLORS.DARK_BLUE),
           pos(16 * UNITS, 2 * UNITS),
           origin("top"),
-          layer("ui")
+          layer("ui"),
+          outline(4, COLORS.MED_BLUE)
         ]);
         add([
           "title",
-          text("Great!", { size: 40 }),
+          text("Rooftop Cleared!", { size: 40 }),
           origin("center"),
-          pos(stats.pos.x, stats.pos.y + 1 * UNITS),
+          pos(stats.pos.x, stats.pos.y + 2 * UNITS),
           layer("ui")
         ]);
         wait(1, () => {
           add([
-            "misses",
-            text(`Misses: ${misses}`, { size: 14 }),
+            "continue",
+            text("Click to continue", { size: 20 }),
             origin("center"),
-            pos(stats.pos.x, stats.pos.y + 2 * UNITS),
+            pos(stats.pos.x, stats.pos.y + 4 * UNITS),
             layer("ui")
           ]);
-          shake(10);
-          wait(1, () => {
-            add([
-              "ammoRecovered",
-              text(`Ammo Recovered: ${state_default.level.ammoRecovered}`, { size: 14 }),
-              origin("center"),
-              pos(stats.pos.x, stats.pos.y + 3 * UNITS),
-              layer("ui")
-            ]);
-            shake(10);
-            wait(1, () => {
-              add([
-                "continue",
-                text("Click to continue", { size: 20 }),
-                origin("center"),
-                pos(stats.pos.x, stats.pos.y + 5 * UNITS),
-                layer("ui")
-              ]);
-              shake(20);
-              state_default.level.isWon = true;
-            });
-          });
+          shake(20);
+          state_default.level.isWon = true;
         });
       });
     }, "winLevel");
@@ -3660,7 +4152,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         if (state_default.level.isBossBattle) {
           player.state = "prelaunch";
         } else {
-          attemptReset();
+          attemptReset(false);
         }
       });
     }, "incompleteLevel");
@@ -3680,6 +4172,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
           }
         });
         if (isVictory) {
+          addScore(SCORES.SUCCESS);
           winLevel();
         } else {
           incompleteLevel();
@@ -3687,20 +4180,30 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       }
     }, "checkEnd");
     action("blade", (blade) => {
+      if (state_default.isPaused) {
+        return;
+      }
       blade.move(dir(blade.throwAngle).scale(blade.speed * speedModifier()));
       if (blade.pos.y >= height() || blade.pos.x >= width() || blade.pos.y < 0 || blade.pos.x < 0) {
-        misses++;
+        addScore(SCORES.MISS);
         destroy(blade);
         checkEnd();
       }
     });
     action("kickable", (kickable) => {
+      if (state_default.isPaused) {
+        return;
+      }
       if (kickable.kickDirection !== 0) {
         kickable.moveBy(kickable.kickDirection < 0 ? 40 : 0, 0);
       }
     });
     let direction = 1;
     action("launchArrow", (launchArrow2) => {
+      console.log(state_default.isPaused);
+      if (state_default.isPaused) {
+        return;
+      }
       const player = get("player")[0];
       if (player.state === "prelaunch") {
         if (state_default.level.isRecovering) {
@@ -3726,6 +4229,9 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       }
     });
     action("throwArrow", (throwArrow) => {
+      if (state_default.isPaused) {
+        return;
+      }
       const player = get("player")[0];
       if (state_default.level.isSlowMo) {
         throwArrow.angle += THROW_ARROW_SPEED;
@@ -3742,19 +4248,30 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       }
     });
     action("shake", (shakeable) => {
+      if (state_default.isPaused) {
+        return;
+      }
       if (shakeable.pos.y <= shakeable.shakeTop) {
         shakeable.direction = 1;
       } else if (shakeable.pos.y >= shakeable.shakeBottom) {
         shakeable.direction = -1;
       }
-      console.log(shakeable.direction);
       shakeable.moveBy(0, shakeable.direction * 0.5 * UNITS);
     });
     action("animated", (animated) => {
       animated.animSpeed = speedModifier();
     });
+    action("scoreText", (scoreText) => {
+      scoreText.timer -= 1;
+      if (scoreText.timer <= 0) {
+        scoreText.opacity = 0;
+      }
+    });
     action("eye", (eye) => {
       const player = get("player")[0];
+      if (state_default.isPaused || !player) {
+        return;
+      }
       if (eye.disabled || eye.owner && eye.owner.disabled) {
         eye.angle = 0;
       } else {
@@ -3763,6 +4280,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     });
     registerPlayerActions({ attemptReset });
     registerCollisions({ endThrow, checkEnd });
+    registerTextActions();
   });
 
   // code/scenes/title.js
@@ -3771,6 +4289,11 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       "background",
       sprite("title"),
       scale(0.5)
+    ]);
+    add([
+      rect(32 * UNITS, 18 * UNITS),
+      color(COLORS.BLACK),
+      lifespan(1, { fade: 1 })
     ]);
     const cta = add([
       "cta",
@@ -3786,7 +4309,8 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         cta.opacity = 0;
       }
     });
-    mouseClick(() => kaboom_default2.go("instructions"));
+    play("bigHit");
+    mouseClick(() => kaboom_default2.go("game"));
   });
 
   // code/scenes/win.js
@@ -3794,13 +4318,23 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     add([
       "background",
       rect(width(), height()),
-      color(COLORS.BLACK)
+      color(COLORS.DARK_BLUE)
     ]);
     add([
       "title",
-      text("You Win!", { size: 60 }),
+      text("YOU WIN", { size: 60 }),
       origin("center"),
-      pos(16 * UNITS, center().y - 100)
+      pos(16 * UNITS, 6 * UNITS)
+    ]);
+    add([
+      text("Final Score:", { size: 40 }),
+      origin("center"),
+      pos(16 * UNITS, 9 * UNITS)
+    ]);
+    add([
+      text(`${state_default.score}`, { size: 120 }),
+      origin("center"),
+      pos(16 * UNITS, 11 * UNITS)
     ]);
     const cta = add([
       "cta",
@@ -3830,7 +4364,17 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       "title",
       text("GAME OVER", { size: 60 }),
       origin("center"),
-      pos(16 * UNITS, center().y - 100)
+      pos(16 * UNITS, 6 * UNITS)
+    ]);
+    add([
+      text("Final Score:", { size: 40 }),
+      origin("center"),
+      pos(16 * UNITS, 9 * UNITS)
+    ]);
+    add([
+      text(`${state_default.score}`, { size: 120 }),
+      origin("center"),
+      pos(16 * UNITS, 11 * UNITS)
     ]);
     const cta = add([
       "cta",
@@ -3846,7 +4390,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         cta.opacity = 0;
       }
     });
-    mouseClick(() => kaboom_default2.go("game"));
+    mouseClick(() => kaboom_default2.go("game", { reset: true }));
   });
 
   // code/scenes/instructions.js
@@ -3901,8 +4445,311 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     mouseClick(() => kaboom_default2.go("game"));
   });
 
+  // code/scenes/intro.js
+  kaboom_default2.scene("intro", (args = {}) => {
+    let isAnimating = true;
+    const background = add([
+      sprite("background"),
+      scale(0.5),
+      layer("bg"),
+      pos(-10 * UNITS, -6 * UNITS)
+    ]);
+    const bottomBar = add([
+      rect(32 * UNITS, 18 * UNITS),
+      color(COLORS.BLACK),
+      pos(16 * UNITS, 0 * UNITS),
+      origin("top")
+    ]);
+    add([
+      rect(8 * UNITS, 18 * UNITS),
+      color(COLORS.BLACK)
+    ]);
+    add([
+      rect(0.25 * UNITS, 18 * UNITS),
+      color(COLORS.BLACK),
+      pos(12 * UNITS, 0)
+    ]);
+    add([
+      rect(0.25 * UNITS, 18 * UNITS),
+      color(COLORS.BLACK),
+      pos(20 * UNITS, 0)
+    ]);
+    add([
+      rect(8 * UNITS, 18 * UNITS),
+      color(COLORS.BLACK)
+    ]);
+    add([
+      pos(24 * UNITS, 0),
+      rect(8 * UNITS, 18 * UNITS),
+      color(COLORS.BLACK)
+    ]);
+    const character = add([
+      sprite("player", { flipX: true }),
+      pos(16 * UNITS, bottomBar.pos.y),
+      origin("bot"),
+      follow(bottomBar, vec2(3.25 * UNITS, 0)),
+      color(COLORS.BLACK)
+    ]);
+    const topBar = add([
+      rect(32 * UNITS, 6 * UNITS),
+      color(COLORS.BLACK),
+      pos(bottomBar.pos),
+      origin("bot"),
+      follow(bottomBar, vec2(0, -4 * UNITS))
+    ]);
+    const introSong = play("intro", { loop: true });
+    action(() => {
+      if (isAnimating) {
+        bottomBar.pos.y += 0.75;
+        background.pos.y += 0.25;
+        if (bottomBar.pos.y >= 8 * UNITS) {
+          isAnimating = false;
+          addConversation("intro", 2, () => {
+            introSong.stop();
+            go("title");
+          }, true);
+        }
+      }
+    });
+    registerTextActions();
+  });
+
+  // code/scenes/cinematic.js
+  kaboom_default2.scene("cinematic", (args = {}) => {
+    var _a, _b;
+    const launchId = (_a = args.launchId) != null ? _a : 0;
+    const landId = (_b = args.landId) != null ? _b : 1;
+    let isRising = false;
+    let maestro = -1;
+    const heightModifer = -1.75 * UNITS;
+    play("mainGame", { loop: true });
+    add([
+      "sky",
+      sprite("background"),
+      scale(0.5),
+      layer("bg")
+    ]);
+    addLevel(cinematicLevel, {
+      width: 48,
+      height: 48,
+      "_": () => [...tileComps, "launch", sprite(`building${launchId}`, { frame: 0 })],
+      "A": () => [...tileComps, "launch", sprite(`building${launchId}`, { frame: 2 })],
+      "B": () => [...tileComps, "launch", sprite(`building${launchId}`, { frame: 3 })],
+      "C": () => [...tileComps, "launch", sprite(`building${launchId}`, { frame: 4 })],
+      "D": () => [...tileComps, "launch", sprite(`building${launchId}`, { frame: 5 })],
+      "E": () => [...tileComps, "launch", sprite(`building${launchId}`, { frame: 6 })],
+      "F": () => [...tileComps, "launch", sprite(`building${launchId}`, { frame: 7 })],
+      "T": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 0 }), "top"],
+      "0": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 0 }), "wall"],
+      "1": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 2 }), "wall"],
+      "2": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 3 })],
+      "3": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 2 })],
+      "4": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 4 }), "wall"],
+      "5": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 5 })],
+      "6": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 4 })],
+      "7": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 6 }), "wall"],
+      "8": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 7 })],
+      "9": () => [...tileComps, "land", sprite(`building${landId}`, { frame: 6 })]
+    });
+    const tops = get("top");
+    const rooftop = tops[Math.floor(tops.length / 2)];
+    const bossHead = add([
+      sprite("bossHead"),
+      scale(0.5),
+      pos(16 * UNITS, 16 * UNITS),
+      origin("center"),
+      z(2)
+    ]);
+    const bossEye = add([
+      sprite("bossEye"),
+      scale(0.5),
+      area(),
+      pos(bossHead.pos),
+      follow(bossHead, vec2(8, 0.5 * UNITS)),
+      origin("center"),
+      z(3)
+    ]);
+    const bossBody = add([
+      "bossBody",
+      sprite("bossBody"),
+      rotate(0),
+      scale(0.5, 0.75),
+      origin("top"),
+      pos(bossHead.pos),
+      follow(bossHead),
+      z(1)
+    ]);
+    const leftHand = add([
+      sprite("bossHand", { flipX: false }),
+      origin("center"),
+      pos(16 * UNITS - 6 * UNITS, rooftop.pos.y + heightModifer + 3.5 * UNITS),
+      scale(0.75),
+      z(3)
+    ]);
+    const rightHand = add([
+      sprite("bossHand", { flipX: true }),
+      origin("center"),
+      pos(16 * UNITS + 6 * UNITS, rooftop.pos.y + heightModifer + 3.5 * UNITS),
+      scale(0.75),
+      z(3)
+    ]);
+    const leftArm = add([
+      rect(1 * UNITS, 10 * UNITS),
+      area(),
+      color(COLORS.DARK_GREY),
+      pos(bossBody.pos),
+      follow(bossBody, vec2(-0.5 * UNITS, 3 * UNITS)),
+      origin("top")
+    ]);
+    leftHand.action(() => {
+      leftArm.angle = leftArm.pos.angle(leftHand.pos) + 90;
+      leftArm.height = leftArm.pos.dist(leftHand.pos);
+    });
+    const rightArm = add([
+      rect(1 * UNITS, 10 * UNITS),
+      area(),
+      color(COLORS.DARK_GREY),
+      pos(bossBody.pos),
+      follow(bossBody, vec2(0.5 * UNITS, 3 * UNITS)),
+      origin("top")
+    ]);
+    rightHand.action(() => {
+      rightArm.angle = rightArm.pos.angle(rightHand.pos) + 90;
+      rightArm.height = rightArm.pos.dist(rightHand.pos);
+    });
+    const character = add([
+      sprite("player"),
+      pos(16 * UNITS, rooftop.pos.y),
+      origin("bot"),
+      follow(rooftop),
+      z(3)
+    ]);
+    addFade(true, () => {
+      addConversation("bossCinematic1", 1, () => {
+        shake(20);
+        play("explosion");
+        addConversation("bossCinematic2", 0.5, () => {
+          wait(1, () => {
+            shake(20);
+            play("explosion");
+            wait(2, () => {
+              maestro = 0;
+              play("handRaise");
+            });
+          });
+        }, true);
+      }, true);
+    });
+    bossHead.action(() => {
+      if (isRising) {
+        bossHead.pos.y -= 0.75;
+        shake(1);
+        if (bossHead.pos.y <= rooftop.pos.y - 10 * UNITS) {
+          isRising = false;
+        }
+      }
+    });
+    action(() => {
+      if (maestro === 0) {
+        const leftUpPos = vec2(10 * UNITS, rooftop.pos.y - 4.5 * UNITS);
+        leftHand.moveTo(leftUpPos, 600);
+        if (leftHand.pos.eq(leftUpPos)) {
+          wait(0.75, () => {
+            maestro = 1;
+          });
+        }
+      } else if (maestro === 1) {
+        const leftDownPos = vec2(10 * UNITS, rooftop.pos.y + heightModifer);
+        leftHand.moveTo(leftDownPos, 1200);
+        if (leftHand.pos.eq(leftDownPos)) {
+          maestro = 2;
+          play("explosion");
+          shake(10);
+          character.play("landing");
+        }
+      } else if (maestro === 2) {
+        addConversation("bossCinematic3", 0, () => {
+          maestro = 3;
+          play("handRaise");
+        }, true);
+      } else if (maestro === 3) {
+        const rightUpPos = vec2(22 * UNITS, rooftop.pos.y - 4.5 * UNITS);
+        rightHand.moveTo(rightUpPos, 600);
+        if (rightHand.pos.eq(rightUpPos)) {
+          wait(0.75, () => {
+            maestro = 4;
+          });
+        }
+      } else if (maestro === 4) {
+        const rightDownPos = vec2(22 * UNITS, rooftop.pos.y + heightModifer);
+        rightHand.moveTo(rightDownPos, 1200);
+        if (rightHand.pos.eq(rightDownPos)) {
+          play("explosion");
+          maestro = 6;
+          shake(10);
+          isRising = true;
+          play("rising");
+          addConversation("bossCinematic4", 1, () => {
+            maestro = 5;
+          }, true);
+        }
+      } else if (maestro === 5 && !isRising) {
+        go("game", { level: levels_default.length - 1 });
+      }
+    });
+    registerTextActions();
+  });
+
+  // code/scenes/continue.js
+  kaboom_default2.scene("continue", (args = {}) => {
+    let countdownNumber = 10;
+    add([
+      "sky",
+      sprite("background"),
+      scale(0.5),
+      layer("bg")
+    ]);
+    add([
+      "title",
+      text("Continue?", { size: 80 }),
+      origin("center"),
+      pos(16 * UNITS, 9 * UNITS - 100)
+    ]);
+    const countdown = add([
+      text(`${countdownNumber}`, { size: 120 }),
+      origin("center"),
+      pos(16 * UNITS, center().y)
+    ]);
+    const cta = add([
+      "cta",
+      text("Click to try again", { size: 30 }),
+      pos(31 * UNITS, 17 * UNITS),
+      origin("right"),
+      opacity(0)
+    ]);
+    loop(0.75, () => {
+      if (cta.opacity === 0) {
+        cta.opacity = 1;
+      } else {
+        cta.opacity = 0;
+      }
+    });
+    const iterateTimer = /* @__PURE__ */ __name(() => {
+      countdownNumber--;
+      if (countdownNumber < 0) {
+        go("gameOver");
+      } else {
+        countdown.text = `${countdownNumber}`;
+      }
+    }, "iterateTimer");
+    loop(1.5, () => {
+      iterateTimer();
+    });
+    mouseClick(() => kaboom_default2.go("game"));
+  });
+
   // code/main.js
   loadAssets_default();
-  kaboom_default2.go("title");
+  kaboom_default2.go("intro");
 })();
 //# sourceMappingURL=game.js.map

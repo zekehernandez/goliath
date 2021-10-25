@@ -5,4 +5,4 @@ import "./utils";
 
 loadAssets();
 
-k.go("title");
+k.go("intro");

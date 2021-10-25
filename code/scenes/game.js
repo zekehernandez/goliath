@@ -1,19 +1,19 @@
 import k from "../kaboom";
 import { UNITS } from '../constants';
-import { COLORS, getColliderComps, addExplosion } from '../utils';
+import { COLORS, getColliderComps, addExplosion, isDebugging, addScore } from '../utils';
 import levels from '../levels';
 import { createPlayer, destroyPlayer, addPlayerColliders, registerPlayerActions } from '../entities/player';
 import { moverProps, kickableProps } from '../entities';
 import { addFlierParts } from '../entities/flier'; 
 import { addStanderParts } from '../entities/stander';
+import { addActiveText, registerTextActions } from '../entities/text';
 import { registerCollisions } from '../events/collisions';
-import state, { resetLevelState, speedModifier } from '../state';
+import state, { resetLevelState, speedModifier, SCORES, softReset } from '../state';
 import loadLevel from '../loadLevel';
+import { addConversation } from '../entities/text'
 
 // general game consts
 const GRAVITY = 0.2;
-const STARTING_AMMO_COUNT = 5;
-const STARTING_SMOKE_BOMB_COUNT = 3;
 
 const WALL_COLLIDER_THICKNESS = 16;
 
@@ -57,33 +57,33 @@ const throwArrowComps = [
 ];
 
 k.scene("game", (args = {}) => {
-  resetLevelState();
+  if (args.reset) {
+    softReset()
+  }
 
-  // game state
-  let currentLevel;
-  let ammoCount = STARTING_AMMO_COUNT;
-  let smokeBombCount = STARTING_SMOKE_BOMB_COUNT;
+  play("mainGame", { loop: true });
+
+  const startingLevel = args.level ?? state.currentLevel;
+  resetLevelState();
 
   // level state
   let previousMouseDown;
-  let misses;
   
   let launchArrow;
   let overlay;
   let ammoCounter;
-  let smokeBombCounter;
-
+  let energyCounter;
 
   let startingPosition;
 
-  const getAmmoCounterText = () => `Ammo: ${ammoCount}`;
-  const getSmokeBombCounterText = () => `Smoke Bombs: ${smokeBombCount}`;
+  const getAmmoCounterText = () => `Kunai: ${state.level.ammoCount}`;
+  const getEnergyCounterText = () => `Energy: ${state.level.energyCount}`;
 
   layers([
     "bg",
     "game",
     "ui",
-], "game");
+  ], "game");
 
   const startLevel = (newLevel) => {
     // destroy any existing game objects
@@ -92,29 +92,46 @@ k.scene("game", (args = {}) => {
     state.currentBuilding = (state.currentBuilding + 1) % 3;
     const nextBuilding = (state.currentBuilding + 1) % 3;
 
-    ammoCount += state.level.ammoRecovered;
+    state.currentLevel = newLevel;
+    resetLevelState();
+    previousMouseDown = mouseIsDown();
+  
+    add([
+      "scoreCounter",
+      text(`SCORE: ${state.score}`, { width: 30*UNITS, size: 24 }),
+      pos(31*UNITS, 1*UNITS),
+      origin("topright"),
+      layer("ui"),
+      z(100),
+      color(COLORS.WHITE),
+    ])
+
+    add([
+      "scoreText",
+      text('', { width: 30*UNITS, size: 20 }),
+      pos(31*UNITS, 2*UNITS),
+      origin("topright"),
+      layer("ui"),
+      z(100),
+      color(COLORS.WHITE),
+    ])
+
+    energyCounter = add([
+      "smokeBombsCounter",
+      text(getEnergyCounterText(), { size: 24 }),
+      pos(1*UNITS, 1*UNITS),
+      layer('ui'),
+      color(state.level.energyCount > 0 ? COLORS.WHITE : COLORS.RED),
+    ]);
 
     ammoCounter = add([
       "ammoCounter",
       text(getAmmoCounterText(), { size: 24 }),
-      pos(1*UNITS, 1*UNITS),
-      layer('ui'),
-      color(ammoCount > 0 ? COLORS.WHITE : COLORS.RED),
-    ]);
-
-    smokeBombCounter = add([
-      "smokeBombsCounter",
-      text(getSmokeBombCounterText(), { size: 24 }),
       pos(1*UNITS, 2*UNITS),
       layer('ui'),
-      color(smokeBombCount > 0 ? COLORS.WHITE : COLORS.RED),
+      color(state.level.ammoCount > 0 ? COLORS.WHITE : COLORS.RED),
     ]);
 
-    currentLevel = newLevel;
-    resetLevelState();
-    previousMouseDown = mouseIsDown();
-    state.level.ammoRecovered = 0;
-    misses = 0;
 
     add([
       "sky",
@@ -138,7 +155,7 @@ k.scene("game", (args = {}) => {
       }
     });
 
-    loadLevel(levels[currentLevel], state.currentBuilding, nextBuilding);
+    loadLevel(levels[state.currentLevel], state.currentBuilding, nextBuilding);
 
     state.level.isBossBattle = get("bossEye").length > 0;
 
@@ -183,18 +200,36 @@ k.scene("game", (args = {}) => {
 
     addFlierParts();
     addStanderParts();
+
+    
+    if (state.currentLevel === 0) {
+      addConversation("firstLevel", 1, () => { previousMouseDown = mouseIsDown() });
+    }
+
+    if (get("stander").length > 0) {
+      addConversation("firstStander", 1, () => { previousMouseDown = mouseIsDown() });
+    }
+
+    if (get("flier").length > 0) {
+      addConversation("firstFlier", 1, () => { previosMouseDown = mouseIsDown() });
+    }
+
+    if (state.currentLevel === 3) {
+      addConversation("checkIn", 1, () => { previousMouseDown = mouseIsDown() });
+    }
   }
 
-  startLevel(0);
+  startLevel(startingLevel);
 
   /**
    * Event Handling
    */
 
   const reset = () => {
+    addConversation("teleport", 0.5, () => { previousMouseDown = mouseIsDown() });
     useSmokeBomb();
     destroyPlayer();
-    console.trace('hwhy');
+
     destroyAll("throwArrow");
     launchArrow.destroy();
     state.level.isSlowMo = false;
@@ -205,11 +240,21 @@ k.scene("game", (args = {}) => {
     add([...throwArrowComps, follow(player)]);
   }
 
-  const attemptReset = () => {
-    if (smokeBombCount > 0) {
+  const attemptReset = (fromFalling) => {
+    if (fromFalling) {
+      addScore(SCORES.FALL);
+    }
+
+    if (state.level.energyCount > 0) {
       reset();
     } else {
-      go("gameOver");
+      destroyPlayer();
+      destroyAll("throwArrow");
+      launchArrow.destroy();
+      addConversation('death', 0, () => {
+        previousMouseDown = mouseIsDown();
+        go("continue");
+      });
     }
   }
 
@@ -218,18 +263,18 @@ k.scene("game", (args = {}) => {
   }
 
   const useAmmo = () => {
-    ammoCount -= 1;
+    state.level.ammoCount -= 1;
     ammoCounter.text = getAmmoCounterText();
-    if (ammoCount === 0) {
+    if (state.level.ammoCount === 0) {
       ammoCounter.color = COLORS.RED;
     }
   }
 
   const useSmokeBomb = () => {
-    smokeBombCount -= 1;
-    smokeBombCounter.text = getSmokeBombCounterText();
-    if (smokeBombCount === 0) {
-      smokeBombCounter.color = COLORS.RED;
+    state.level.energyCount -= 1;
+    energyCounter.text = getEnergyCounterText();
+    if (state.level.energyCount === 0) {
+      energyCounter.color = COLORS.RED;
     }
   }
 
@@ -259,9 +304,12 @@ k.scene("game", (args = {}) => {
     const bladePos = throwArrow.pos.add(dir(throwArrow.angle - 90).scale(BLADE_START_DISTANCE));
     add([
       "blade",
-      rect(10, 10),
+      sprite("kunai"),
       area(),
       pos(bladePos),
+      scale(0.3),
+      rotate(throwArrow.angle),
+      origin("center"),
       z(5),
       {
         speed: BLADE_SPEED,
@@ -274,16 +322,20 @@ k.scene("game", (args = {}) => {
   };
 
   const gameAction = () => {
+    if (state.isPaused) {
+      return;
+    }
+    
     const player = get("player")[0];
     if (player.state === "launched" && !player.isThrowing && !player.isKicking && !state.level.isRecovering) {
-      ammoCount > 0 ? startThrow() : flashAmmo();
+      state.level.ammoCount > 0 ? startThrow() : flashAmmo();
     } else if (player.isThrowing) {
-      ammoCount > 0 ? throwBlade() : flashAmmo();
+      state.level.ammoCount > 0 ? throwBlade() : flashAmmo();
     } else if (state.level.isWon) {
-      if (currentLevel + 1 === levels.length) {
+      if (state.currentLevel + 1 === levels.length) {
         go("win");
       } else {
-        startLevel(currentLevel + 1);
+        startLevel(state.currentLevel + 1);
       }
     }
   }
@@ -312,12 +364,20 @@ k.scene("game", (args = {}) => {
   }
 
   const doMouseDown = () => {
+    if (state.isPaused) {
+      return;
+    }
+
     if (!previousMouseDown) {
       actionDown();
     }
   };
 
   const doMouseUp = () => {
+    if (state.isPaused) {
+      return;
+    }
+
     if (previousMouseDown) {
       previousMouseDown = false;
     } else {
@@ -329,11 +389,11 @@ k.scene("game", (args = {}) => {
   mouseRelease(doMouseUp);
   mouseClick(gameAction)
 
-  keyDown("space", actionDown);
-  keyRelease("space", actionUp);
-  keyPress("space", gameAction);
-
-  keyPress("tab", () => startLevel(currentLevel))
+  keyPress("tab", () => {
+    if (isDebugging) {
+      startLevel((state.currentLevel + 1) % levels.length);
+    }
+  });
 
   const winLevel = () => {
     wait(1, () => {
@@ -353,53 +413,32 @@ k.scene("game", (args = {}) => {
       const stats = add([
         rect(10*UNITS, 6*UNITS),
         area(),
-        color(COLORS.BLACK),
+        color(COLORS.DARK_BLUE),
         pos(16*UNITS, 2*UNITS),
         origin("top"),
         layer('ui'),
+        outline(4, COLORS.MED_BLUE)
       ]);
 
       add([
         "title",
-        text("Great!", { size: 40 }),
+        text("Rooftop Cleared!", { size: 40 }),
         origin("center"),
-        pos(stats.pos.x, stats.pos.y + 1*UNITS),
+        pos(stats.pos.x, stats.pos.y + 2*UNITS),
         layer('ui'),
       ]);
 
       wait(1, () => {
         add([
-          "misses",
-          text(`Misses: ${misses}`, { size: 14 }),
+          "continue",
+          text("Click to continue", { size: 20 }),
           origin("center"),
-          pos(stats.pos.x, stats.pos.y + 2*UNITS),
+          pos(stats.pos.x, stats.pos.y + 4*UNITS),
           layer('ui'),
         ]);
-        shake(10);
+        shake(20);
 
-        wait(1, () => {
-          add([
-            "ammoRecovered",
-            text(`Ammo Recovered: ${state.level.ammoRecovered}`, { size: 14 }),
-            origin("center"),
-            pos(stats.pos.x, stats.pos.y + 3*UNITS),
-            layer('ui'),
-          ]);
-          shake(10);
-
-          wait(1, () => {
-            add([
-              "continue",
-              text("Click to continue", { size: 20 }),
-              origin("center"),
-              pos(stats.pos.x, stats.pos.y + 5*UNITS),
-              layer('ui'),
-            ]);
-            shake(20);
-
-            state.level.isWon = true;
-          });
-        }); 
+        state.level.isWon = true;
       });
     });
   }
@@ -420,7 +459,7 @@ k.scene("game", (args = {}) => {
       if (state.level.isBossBattle) {
         player.state = "prelaunch";
       } else {
-        attemptReset();
+        attemptReset(false);
       }
     })
   };
@@ -443,6 +482,7 @@ k.scene("game", (args = {}) => {
       });
 
       if (isVictory) {
+        addScore(SCORES.SUCCESS);
         winLevel();
       } else {
         incompleteLevel();
@@ -451,17 +491,25 @@ k.scene("game", (args = {}) => {
   };
 
   action("blade", (blade) => {
+    if (state.isPaused) {
+      return;
+    }
+
     blade.move(dir(blade.throwAngle).scale(blade.speed * speedModifier()));
 
     if (blade.pos.y >= height() || blade.pos.x >= width() 
     || blade.pos.y < 0 || blade.pos.x < 0) {
-      misses++;
+      addScore(SCORES.MISS)
       destroy(blade);
       checkEnd();
     }
   });
 
   action("kickable", kickable => {
+    if (state.isPaused) {
+      return;
+    }
+
     if (kickable.kickDirection !== 0) {
       kickable.moveBy(kickable.kickDirection < 0 ? 40 : 0, 0);
     }
@@ -470,6 +518,11 @@ k.scene("game", (args = {}) => {
   // launch arrow movement
   let direction = 1;
   action("launchArrow", launchArrow => {
+    console.log(state.isPaused)
+    if (state.isPaused) {
+      return;
+    }
+
     const player = get("player")[0];
 
     if (player.state === "prelaunch") {
@@ -499,6 +552,10 @@ k.scene("game", (args = {}) => {
 
   // throw arrow movement
   action("throwArrow", throwArrow => {
+    if (state.isPaused) {
+      return;
+    }
+
     const player = get("player")[0];
 
     if (state.level.isSlowMo) {
@@ -511,6 +568,7 @@ k.scene("game", (args = {}) => {
   });
 
   action("mover", mover => {
+
     mover.moveBy(mover.sideSpeed * speedModifier(), -mover.upSpeed * speedModifier());
 
     if (!state.level.isSlowMo) {
@@ -519,13 +577,16 @@ k.scene("game", (args = {}) => {
   });
 
   action("shake", shakeable => {
+    if (state.isPaused) {
+      return;
+    }
+
     if (shakeable.pos.y <= shakeable.shakeTop) {
       shakeable.direction = 1;
     } else if (shakeable.pos.y >= shakeable.shakeBottom) {
       shakeable.direction = -1;
     }
 
-    console.log(shakeable.direction)
     shakeable.moveBy(0, shakeable.direction * 0.5*UNITS);
   });
 
@@ -533,8 +594,19 @@ k.scene("game", (args = {}) => {
     animated.animSpeed = speedModifier();
   });
 
+  action("scoreText", scoreText => {
+    scoreText.timer -= 1;
+    if (scoreText.timer <= 0) {
+      scoreText.opacity = 0;
+    }
+  });
+
   action("eye", eye => {
     const player = get("player")[0];
+    if (state.isPaused || !player) {
+      return;
+    }
+
     if (eye.disabled || (eye.owner && eye.owner.disabled)) {
       eye.angle = 0;
     } else {
@@ -544,4 +616,5 @@ k.scene("game", (args = {}) => {
 
   registerPlayerActions({ attemptReset });
   registerCollisions({ endThrow, checkEnd });
+  registerTextActions();
 });

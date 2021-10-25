@@ -33,7 +33,7 @@ export const addFlierParts = () => {
     const flierHurtbox = add([
       "flierHurtbox",
       "enemyHurtbox",
-      rect(1*UNITS, 1.5*UNITS),
+      rect(1*UNITS, 1.25    *UNITS),
       pos(flier.pos),
       area(),
       origin("center"),
@@ -76,6 +76,10 @@ export const addFlierParts = () => {
 
   let direction = -1;
   action("flier", flier => {
+    // if (state.isPaused) {
+    //   return;
+    // }
+
     if (!flier.disabled) {
       if (flier.pos.y < flier.startingHeight - HOVER_DISTANCE) {
         direction = 1;
@@ -85,9 +89,7 @@ export const addFlierParts = () => {
 
       const distanceFromStart = Math.abs(flier.startingHeight - flier.pos.y);
       const speed = Math.abs(HOVER_DISTANCE - distanceFromStart);
-
-      console.log(speed)
-
+      
       flier.pos.y = flier.pos.y + (direction * (1 + speed/64) * speedModifier()); 
     }
   });

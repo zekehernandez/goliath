@@ -1,6 +1,6 @@
 import { UNITS } from '../constants';
-import { COLORS, flash, shakeEntity, getColliderComps } from '../utils';
-import state, { speedModifier } from '../state';
+import { COLORS, flash, shakeEntity, getColliderComps, addScore } from '../utils';
+import state, { speedModifier, SCORES } from '../state';
 import { shakeableProps } from './'
 
 const MOVE_SPEED = 8*UNITS;
@@ -22,6 +22,9 @@ export const createBoss = () => {
   let acceleration = 0;
   let stepsTilNextPhase = Math.floor(rand(MIN_STEPS, MAX_STEPS));
   let inPhase;
+
+  let laserSound;
+  let chargingSound;
 
   const bossHead = add([
     "bossHead",
@@ -167,6 +170,7 @@ export const createBoss = () => {
     searchingForTarget = true;
     wait(rand(0.5, 3) + MIN_TARGET_SEARCH_TIME, () => {
       searchingForTarget = false;
+      play("bossMoving");
       bossTarget = choose(bossTargets);
     })
   };
@@ -181,6 +185,12 @@ export const createBoss = () => {
     bossEye.shootTimer = SHOOTING_TIME;
     stepsTilNextPhase = Math.floor(rand(MIN_STEPS, MAX_STEPS));
     inPhase = false;
+    if (laserSound) {
+      laserSound.stop();
+    }
+    if (chargingSound) {
+      chargingSound.stop();
+    }
   }
 
   const startNewPhase = () => {
@@ -225,6 +235,7 @@ export const createBoss = () => {
     const curAnim = bossEye.curAnim();
     if (bossEye.isCharging) {
       if (curAnim !== "charging") {
+        chargingSound = play("charging");
         bossEye.play("charging", { loop: true, pingpong: true })
       } else {
         bossEye.chargeTimer -= 1 * speedModifier();
@@ -239,6 +250,7 @@ export const createBoss = () => {
       }
     } else if (bossEye.isShooting) {
       if (curAnim !== "shooting") {
+        laserSound = play("laser");
         bossEye.play("shooting", { loop: true, pingpong: true })
       } else {
         bossEye.shootTimer -= 1 * speedModifier();
@@ -275,9 +287,11 @@ export const createBoss = () => {
     if (bossEye.isCharging || bossEye.isShooting) {
       shake(10);
       bossEye.health--;
+      play("hit");
       endPhase();
       if (bossEye.health <= 0) {
         bossEye.disabled = true;
+        addScore(SCORES.BOSS_SUCCESS)
       } else {
         wait(1, () => {
           slam();
@@ -296,14 +310,15 @@ export const createBoss = () => {
   collides("bossLaserCollider", "player", (bossLaserCollider, player) => {
     console.log('here')
     if (bossEye.isShooting && !state.level.isRecovering) {
-      state.health--;
-      if (state.health <= 0) {
+      state.level.energyCount--;
+      if (state.energyCount <= 0) {
         wait(2, () => {
-          go("gameOver");
+          go("continue");
         })
       }
       state.level.isRecovering = true;
-      wait(5, () => {
+      player.angle = 0;
+      wait(3, () => {
         state.level.isRecovering = false;
       });
     }
@@ -318,3 +333,4 @@ export const createBossTarget = () => {
     opacity(0),
   ]
 };
+

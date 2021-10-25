@@ -4,6 +4,7 @@ import state from '../state';
 import { UNITS } from '../constants';
 import { COLORS, getColliderComps } from '../utils';
 import { START_JUMP_END_FRAME, LANDING_END_FRAME, FALLING_END_FRAME } from '../loadAssets';
+import { addConversation } from './text'
 
 const playerComps = [
   "player",
@@ -52,10 +53,12 @@ export const addPlayerColliders = () => {
 export const registerPlayerActions = ({ attemptReset }) => {
   // player movement
   action("player", player => {
-    console.log(`state: ${player.state}, isThrowing: ${player.isThrowing}, isRecovering: ${state.level.isRecovering}`);
+
+    // console.log(`state: ${player.state}, isThrowing: ${player.isThrowing}, isRecovering: ${state.level.isRecovering}`);
 
     if (player.pos.x > width() + 2*UNITS || player.pos.y > height() + 2*UNITS) {
-      attemptReset();
+      shake(10);
+      attemptReset(true);
     }
 
     // I have to manage the animation transitions like this because onEnd()
@@ -64,7 +67,7 @@ export const registerPlayerActions = ({ attemptReset }) => {
       player.angle = 0;
       player.play("kicking", { loop: true })
     } else if (state.level.isRecovering) {
-      player.play("landing")
+      player.frame = LANDING_END_FRAME;
     } else if (player.state === "prelaunch" && curAnim !== "idle") {
       player.play("idle", { loop: true, speed: 4 });
     } else if (player.state === "launching" && curAnim !== "crouch") {
@@ -93,7 +96,7 @@ export const registerPlayerActions = ({ attemptReset }) => {
         player.flipX(false);
         player.angle = 0;
       }
-    } else if (curAnim !== "idle" && (get("target").length === 0 || state.level.isWon === true)) {
+    } else if (player.state === "landed" && curAnim !== "idle" && (get("target").length === 0 || state.level.isWon === true)) {
       player.play("idle", { loop: true, speed: 4});
     }
   });

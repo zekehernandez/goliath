@@ -18,6 +18,7 @@ const loadAssets = () => {
   // load assets
   k.loadSprite("bean", "sprites/bean.png");
   k.loadSprite("arrow", "sprites/arrow.png");
+  k.loadSprite("kunai", "sprites/kunai.png");
   k.loadSprite("background", "sprites/background.png");
   k.loadSprite("title", "sprites/title.png");
   k.loadSprite("explosion", "sprites/explosion.png", {
@@ -134,6 +135,21 @@ const loadAssets = () => {
   for (let i = 0; i < BUILDING_COUNT; i++) {
     loadBuilding(i);
   } 
+
+
+  k.loadSound("bigHit", "sounds/title.wav");
+  k.loadSound("intro", "sounds/intro.wav");
+  k.loadSound("explosion", "sounds/explosion.wav");
+  k.loadSound("bossDeath", "sounds/boss_death.wav")
+  k.loadSound("disabledFlier", "sounds/disabled-flier.wav");
+  k.loadSound("disabledTallbot", "sounds/disabled-tallbot.wav");
+  k.loadSound("mainGame", "sounds/main_game.mp3");
+  k.loadSound("bossMoving", "sounds/moving.wav");
+  k.loadSound("rising", "sounds/rising.wav");
+  k.loadSound("hit", 'sounds/hit.wav');
+  k.loadSound("handRaise", "sounds/hit.wav");
+  k.loadSound("charging", "sounds/charging.wav");
+  k.loadSound("laser", "sounds/laser.wav");
 };
 
 export default loadAssets;

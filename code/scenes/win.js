@@ -1,19 +1,32 @@
 import k from '../kaboom';
 import { COLORS } from '../utils';
-import { UNITS } from '../constants'
+import { UNITS } from '../constants';
+import state from '../state';
 
 k.scene("win", (args = {}) => {
   add([
     "background",
     rect(width(), height()),
-    color(COLORS.BLACK),
+    color(COLORS.DARK_BLUE),
   ])
 
   add([
       "title",
-      text("You Win!", { size: 60 }),
+      text("YOU WIN", { size: 60 }),
       origin("center"),
-      pos(16*UNITS, center().y - 100),
+      pos(16*UNITS, 6*UNITS),
+  ]);
+
+  add([
+    text("Final Score:", { size: 40 }),
+    origin("center"),
+    pos(16*UNITS, 9*UNITS),
+  ]);
+  
+  add([
+    text(`${state.score}`, { size: 120 }),
+    origin("center"),
+    pos(16*UNITS, 11*UNITS),
   ]);
 
   const cta = add([

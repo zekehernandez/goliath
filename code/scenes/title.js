@@ -1,12 +1,21 @@
 import k from '../kaboom';
 import { UNITS } from '../constants';
+import { COLORS } from '../utils';
 
 k.scene("title", (args = {}) => {
+
   add([
     "background",
     sprite("title"),
       scale(0.5),
   ])
+
+  add([
+    rect(32*UNITS, 18*UNITS),
+    color(COLORS.BLACK),
+    lifespan(1, { fade: 1 }),
+  ])
+
 
   const cta = add([
     "cta",
@@ -24,5 +33,7 @@ k.scene("title", (args = {}) => {
     }
   });
 
-  mouseClick(() => k.go("instructions"))
+  play("bigHit");
+
+  mouseClick(() => k.go("game"))
 });

@@ -1,6 +1,8 @@
 import k from './kaboom';
 import { UNITS } from './constants'
-const isDebugging = false;
+import state from './state'
+
+export const isDebugging = false ;
 
 export const COLORS = {
   WHITE: rgb(194, 225, 223),
@@ -10,6 +12,9 @@ export const COLORS = {
   RED: rgb(240, 50, 50),
   GREEN: rgb(60, 230, 110),
   PURPLE: rgb(200, 100, 200),
+  DARK_BLUE: rgb(48, 74, 78),
+  MED_BLUE: rgb(121, 186, 195),
+  LIGHT_BLUE: rgb(145, 223, 234),
 }
 
 export const getColliderComps = (colliderColor) => ([
@@ -43,8 +48,53 @@ export const addExplosion = position => {
     z(4),
   ]);
 
+  play("explosion");
   explosion.play("main", { onEnd: () => {
     explosion.destroy();
   }});
   wait(0.1, () => {  shake(20) })
+}
+
+export const addFade = (fadeIn, onEnd) => {
+  let multiplier = 1;
+  const fade = add([
+    "fadeIn",
+    rect(32*UNITS, 18*UNITS),
+    pos(0, 0),
+    color(COLORS.BLACK),
+    layer("ui"),
+    z(1000),
+    opacity(fadeIn ? 1 : 0),
+  ]);
+
+  fade.action(() => {
+    fade.opacity -= (fadeIn ? 0.001 : -0.001) * multiplier;
+    multiplier += 0.25;
+    if ((fadeIn && fade.opacity <= 0) || fade.opacity >= 1) {
+      fade.destroy();
+      onEnd && onEnd();
+    }
+  });
+};
+
+export const addScore = (scoreToAdd) => {
+  state.score += scoreToAdd.value;
+
+  const scoreCounter = get("scoreCounter")[0];
+  if (scoreCounter) {
+    scoreCounter.text = `SCORE: ${state.score}`;
+  }
+
+  const scoreText = get("scoreText")[0];
+  if (scoreText) {
+    const isPositive = scoreToAdd.value > 0;
+    scoreText.text = `${scoreToAdd.text}   ${isPositive ? '+' : ''}${scoreToAdd.value}`;
+    if (isPositive) {
+      scoreText.color = COLORS.LIGHT_BLUE;
+    } else {
+      scoreText.color = COLORS.RED;
+    }
+    scoreText.opacity = 1;
+    scoreText.timer = 5 * 60;
+  }
 }
