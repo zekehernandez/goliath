@@ -74,7 +74,6 @@ export const createBoss = () => {
     opacity(0),
     z(3),
   ]);
-  bossLaser.play("main", { loop: true });
 
   const createLaserCollider = () => {
     add([
@@ -260,6 +259,7 @@ export const createBoss = () => {
       }
     } else if (bossEye.disabled) {
       if (inPhase) {
+        play("bossDeath");
         endPhase(); 
       }
       if (bossHead.pos.y < rooftop.pos.y - 2*UNITS) {
@@ -311,7 +311,8 @@ export const createBoss = () => {
     console.log('here')
     if (bossEye.isShooting && !state.level.isRecovering) {
       state.level.energyCount--;
-      if (state.energyCount <= 0) {
+
+      if (state.level.energyCount <= 0) {
         wait(2, () => {
           go("continue");
         })

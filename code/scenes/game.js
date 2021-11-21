@@ -61,7 +61,7 @@ k.scene("game", (args = {}) => {
     softReset()
   }
 
-  play("mainGame", { loop: true });
+  let music = [];
 
   const startingLevel = args.level ?? state.currentLevel;
   resetLevelState();
@@ -88,6 +88,11 @@ k.scene("game", (args = {}) => {
   const startLevel = (newLevel) => {
     // destroy any existing game objects
     k.every((obj) => obj.destroy());
+
+    music.forEach(song => { song.stop && song.stop() });
+    music = [];
+
+    music.push(play("mainGame", { loop: true }));
 
     state.currentBuilding = (state.currentBuilding + 1) % 3;
     const nextBuilding = (state.currentBuilding + 1) % 3;
@@ -124,6 +129,13 @@ k.scene("game", (args = {}) => {
       color(state.level.energyCount > 0 ? COLORS.WHITE : COLORS.RED),
     ]);
 
+    energyCounter.action(() => {
+      energyCounter.text = getEnergyCounterText();
+      if (state.level.energyCount === 0) {
+        energyCounter.color = COLORS.RED;
+      }
+    });
+
     ammoCounter = add([
       "ammoCounter",
       text(getAmmoCounterText(), { size: 24 }),
@@ -132,6 +144,12 @@ k.scene("game", (args = {}) => {
       color(state.level.ammoCount > 0 ? COLORS.WHITE : COLORS.RED),
     ]);
 
+    ammoCounter.action(() => {
+      ammoCounter.text = getAmmoCounterText();
+      if (state.level.ammoCount === 0) {
+        ammoCounter.color = COLORS.RED;
+      }
+    });
 
     add([
       "sky",
@@ -150,8 +168,12 @@ k.scene("game", (args = {}) => {
     overlay.action(() => {
       if (state.level.isSlowMo) {
         overlay.opacity = wave(0.25, 0.5, 1000);
+        music.forEach(song => {song.speed && song.speed(0.75)});
+        music.forEach(song => {song.volume && song.volume(0.75)});
       } else {
         overlay.opacity = 0.25;
+music.forEach(song => {song.speed && song.speed(1)});
+        music.forEach(song => {song.volume && song.volume(1)});
       }
     });
 
@@ -246,6 +268,7 @@ k.scene("game", (args = {}) => {
     }
 
     if (state.level.energyCount > 0) {
+      play("teleport");
       reset();
     } else {
       destroyPlayer();
@@ -253,8 +276,9 @@ k.scene("game", (args = {}) => {
       launchArrow.destroy();
       addConversation('death', 0, () => {
         previousMouseDown = mouseIsDown();
+        music.forEach(song => song.stop());
         go("continue");
-      });
+      }, false, true);
     }
   }
 
@@ -264,18 +288,10 @@ k.scene("game", (args = {}) => {
 
   const useAmmo = () => {
     state.level.ammoCount -= 1;
-    ammoCounter.text = getAmmoCounterText();
-    if (state.level.ammoCount === 0) {
-      ammoCounter.color = COLORS.RED;
-    }
   }
 
   const useSmokeBomb = () => {
-    state.level.energyCount -= 1;
-    energyCounter.text = getEnergyCounterText();
-    if (state.level.energyCount === 0) {
-      energyCounter.color = COLORS.RED;
-    }
+    state.level.energyCount -= 1
   }
 
   // throwing
@@ -283,6 +299,7 @@ k.scene("game", (args = {}) => {
     console.log('callingStartThrow');
     const player = get("player")[0];
     const throwArrow = get("throwArrow")[0];
+    play("slowMo", { seek: 0.25});
     player.isThrowing = true;
     state.level.isSlowMo = true;
     throwArrow.opacity = 1;
@@ -302,6 +319,7 @@ k.scene("game", (args = {}) => {
     player.play("throwing");
     const throwArrow = get("throwArrow")[0];
     const bladePos = throwArrow.pos.add(dir(throwArrow.angle - 90).scale(BLADE_START_DISTANCE));
+    play("throw");
     add([
       "blade",
       sprite("kunai"),
@@ -327,12 +345,17 @@ k.scene("game", (args = {}) => {
     }
     
     const player = get("player")[0];
-    if (player.state === "launched" && !player.isThrowing && !player.isKicking && !state.level.isRecovering) {
+    if (player && player.state === "launched" && !player.isThrowing && !player.isKicking && !state.level.isRecovering) {
       state.level.ammoCount > 0 ? startThrow() : flashAmmo();
-    } else if (player.isThrowing) {
+    } else if (player && player.isThrowing) {
       state.level.ammoCount > 0 ? throwBlade() : flashAmmo();
     } else if (state.level.isWon) {
-      if (state.currentLevel + 1 === levels.length) {
+      music.forEach(song => song.stop());
+      if (state.currentLevel + 1 === levels.length-1) {
+        state.currentLevel + 1
+        music
+        go("cinematic");
+      } else if (state.currentLevel + 1 === levels.length) {
         go("win");
       } else {
         startLevel(state.currentLevel + 1);
@@ -342,7 +365,7 @@ k.scene("game", (args = {}) => {
 
   const actionDown = () => {
     const player = get("player")[0];
-    if (player.state === "prelaunch" && !state.level.isRecovering) {
+    if (player && player.state === "prelaunch" && !state.level.isRecovering) {
       player.state = "launching";
     }
   }
@@ -352,6 +375,7 @@ k.scene("game", (args = {}) => {
 
     if (player.state === "launching") {
       player.state = "launched"
+      play("jump");
       const start = vec2(0,0);
       const direction = state.level.isBossBattle ? 90 : LAUNCH_ARROW_MAX_ANGLE - launchArrow.angle
       const end = start.add((dir(direction).scale(launchArrow.scale.scale(LAUNCH_ARROW_STRENGTH_MODIFIER))));
@@ -396,6 +420,7 @@ k.scene("game", (args = {}) => {
   });
 
   const winLevel = () => {
+    music.forEach(song => song.stop());
     wait(1, () => {
       destroyAll("blade");
       let delay = 0;
@@ -410,6 +435,7 @@ k.scene("game", (args = {}) => {
     });
  
     wait(2, () => {
+      music.push(play("upbeat", { loop: true }));
       const stats = add([
         rect(10*UNITS, 6*UNITS),
         area(),
@@ -436,7 +462,6 @@ k.scene("game", (args = {}) => {
           pos(stats.pos.x, stats.pos.y + 4*UNITS),
           layer('ui'),
         ]);
-        shake(20);
 
         state.level.isWon = true;
       });
@@ -445,11 +470,14 @@ k.scene("game", (args = {}) => {
 
   const incompleteLevel = () => {
     wait(1, () => {
+      play("alert");
       every("enemy", enemy => {
         if (!enemy.disabled && !state.level.isBossBattle) {
           if (enemy.eye) {
             enemy.eye.frame = 8;
           }
+
+          enemy.alerted = true;
         }
       });
     });
@@ -466,6 +494,9 @@ k.scene("game", (args = {}) => {
 
   const checkEnd = () => {
     const player = get("player")[0];
+    if (!player) {
+      return;
+    }
     let isEnded = player.state === "landed";
     every("blade", blade => {
       if (blade.speed > 0) {

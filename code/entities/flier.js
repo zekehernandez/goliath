@@ -76,21 +76,23 @@ export const addFlierParts = () => {
 
   let direction = -1;
   action("flier", flier => {
-    // if (state.isPaused) {
-    //   return;
-    // }
-
     if (!flier.disabled) {
-      if (flier.pos.y < flier.startingHeight - HOVER_DISTANCE) {
-        direction = 1;
-      } else if (flier.pos.y > flier.startingHeight + HOVER_DISTANCE) {
-        direction = -1;
-      }
+      const player = get("player")[0]
 
-      const distanceFromStart = Math.abs(flier.startingHeight - flier.pos.y);
-      const speed = Math.abs(HOVER_DISTANCE - distanceFromStart);
-      
-      flier.pos.y = flier.pos.y + (direction * (1 + speed/64) * speedModifier()); 
+      if (flier.alerted && player && player.state === 'launched') {
+        flier.moveTo(player.pos, 40);
+      } else {
+        if (flier.pos.y < flier.startingHeight - HOVER_DISTANCE) {
+          direction = 1;
+        } else if (flier.pos.y > flier.startingHeight + HOVER_DISTANCE) {
+          direction = -1;
+        }
+
+        const distanceFromStart = Math.abs(flier.startingHeight - flier.pos.y);
+        const speed = Math.abs(HOVER_DISTANCE - distanceFromStart);
+        
+        flier.pos.y = flier.pos.y + (direction * (1 + speed/64) * speedModifier()); 
+      }
     }
   });
 }

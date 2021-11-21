@@ -11,10 +11,10 @@ k.scene("cinematic", (args = {}) => {
   let isRising = false;
 
   let maestro = -1;
+  let music = []
+  music.push(play("mainGame", { loop: true }))
 
   const heightModifer = -1.75*UNITS;
-
-  play("mainGame", { loop: true });
 
   add([
     "sky",
@@ -135,11 +135,11 @@ k.scene("cinematic", (args = {}) => {
   addFade(true, () => {
     addConversation("bossCinematic1", 1, () => {
       shake(20);
-      play("explosion");
+      play("bass");
       addConversation("bossCinematic2", 0.5, () => {
         wait(1, () => {
           shake(20);
-            play("explosion");
+            play("bass");
           wait(2, () => {
             maestro = 0;
             play("handRaise");
@@ -176,7 +176,7 @@ k.scene("cinematic", (args = {}) => {
 
       if (leftHand.pos.eq(leftDownPos)) {
         maestro = 2;
-        play("explosion");
+        play("bass");
         shake(10);
         character.play("landing");
       }
@@ -199,16 +199,16 @@ k.scene("cinematic", (args = {}) => {
       rightHand.moveTo(rightDownPos, 1200);
 
       if (rightHand.pos.eq(rightDownPos)) {
-        play("explosion");
+        play("bass");
         maestro = 6;
         shake(10);
         isRising = true;
-         play("rising");
         addConversation("bossCinematic4", 1, () => {
           maestro = 5;
         }, true);
       }
     } else if (maestro === 5 && !isRising) {
+      music.forEach(song => song.stop())
       go("game", { level: levels.length - 1 });
     }
   });

@@ -33,7 +33,10 @@ k.scene("title", (args = {}) => {
     }
   });
 
-  play("bigHit");
+  const sound = play("bigHit");
 
-  mouseClick(() => k.go("game"))
+  mouseClick(() => {
+    sound.stop();
+    k.go("game");
+  });
 });

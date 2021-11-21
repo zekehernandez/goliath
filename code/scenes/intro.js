@@ -4,7 +4,10 @@ import { UNITS } from '../constants'
 import { addConversation, registerTextActions } from '../entities/text';
 
 k.scene("intro", (args = {}) => {
-  let isAnimating = true;
+  let isAnimating = false;
+  let started = false;
+
+  let audioQueue = []
 
   const background = add([
     sprite("background"),
@@ -64,8 +67,6 @@ k.scene("intro", (args = {}) => {
     follow(bottomBar, vec2(0, -4*UNITS)),
   ]);
 
-  const introSong = play("intro", { loop: true });
-
   action(() => {
     if (isAnimating) {
       bottomBar.pos.y += 0.75;
@@ -74,11 +75,37 @@ k.scene("intro", (args = {}) => {
       if (bottomBar.pos.y >= 8*UNITS) {
         isAnimating = false;
         addConversation("intro", 2, () => {
-          introSong.stop();
+          audioQueue[0].stop();
           go("title");
         }, true);
       }
     }
+  });
+
+  const cta = add([
+    "cta",
+    text("Click to begin", { size: 30 }),
+    pos(31*UNITS, 17*UNITS),
+    origin("right"),
+    opacity(0),
+  ]);
+
+  loop(0.75, () => {
+    if (cta.opacity === 0) {
+      cta.opacity = 1;
+    } else {
+      cta.opacity = 0;
+    }
+  });
+
+
+  mouseClick(() => {
+    if (!started) {
+      isAnimating = true;
+      audioQueue.push(play("intro", { loop: true }));
+      cta.destroy();
+      started = true;
+    } 
   });
 
   registerTextActions();

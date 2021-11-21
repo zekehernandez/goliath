@@ -35,11 +35,10 @@ export const registerTextActions = () => {
   })
 }
 
-export const addConversation = (conversationKey, pause = 1, onEnd = () => {}, hideOverlay = false) => {
+export const addConversation = (conversationKey, pause = 1, onEnd = () => {}, hideOverlay = false, repeat) => {
   console.log('conversationKey', conversationKey)
 
-  if (state.pastConversations.has(conversationKey)) {
-    onEnd && onEnd();
+  if (!repeat && state.pastConversations.has(conversationKey)) {
     return;
   } else {
     if (state.conversationQueue.length > 0) {

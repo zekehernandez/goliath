@@ -2509,12 +2509,24 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     kaboom_default2.loadSound("disabledFlier", "sounds/disabled-flier.wav");
     kaboom_default2.loadSound("disabledTallbot", "sounds/disabled-tallbot.wav");
     kaboom_default2.loadSound("mainGame", "sounds/main_game.mp3");
-    kaboom_default2.loadSound("bossMoving", "sounds/moving.wav");
+    kaboom_default2.loadSound("bossMoving", "sounds/moving_2.wav");
     kaboom_default2.loadSound("rising", "sounds/rising.wav");
     kaboom_default2.loadSound("hit", "sounds/hit.wav");
-    kaboom_default2.loadSound("handRaise", "sounds/hit.wav");
     kaboom_default2.loadSound("charging", "sounds/charging.wav");
     kaboom_default2.loadSound("laser", "sounds/laser.wav");
+    kaboom_default2.loadSound("kick", "sounds/kick.wav");
+    kaboom_default2.loadSound("siren", "sounds/siren.wav");
+    kaboom_default2.loadSound("throw", "sounds/throw2.wav");
+    kaboom_default2.loadSound("land", "sounds/land.wav");
+    kaboom_default2.loadSound("jump", "sounds/jump.wav");
+    kaboom_default2.loadSound("slowMo", "sounds/slowMo.wav");
+    kaboom_default2.loadSound("alert", "sounds/alert.wav");
+    kaboom_default2.loadSound("teleport", "sounds/teleport.wav");
+    kaboom_default2.loadSound("upbeat", "sounds/upbeat.mp3");
+    kaboom_default2.loadSound("kicked", "sounds/kicked.wav");
+    kaboom_default2.loadSound("handRaise", "sounds/hand_raise.wav");
+    kaboom_default2.loadSound("bass", "sounds/bass.wav");
+    kaboom_default2.loadSound("win", "sounds/win.mp3");
   }, "loadAssets");
   var loadAssets_default = loadAssets;
 
@@ -2697,21 +2709,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       "                                ",
       "                                ",
       "                                ",
-      "              o                 ",
-      "                                ",
-      "                                ",
-      "                                ",
-      "                                ",
-      "                                ",
-      " @                              ",
-      "__                     x        ",
-      "AB    0TTTTTTTTTTTTTTTTTTTTTTT  ",
-      "CD    123232323232323232323232  ",
-      "EF    456565656565656565656565  "
-    ],
-    [
-      "                                ",
-      "                                ",
+      "                    o           ",
       "                                ",
       "                                ",
       "                                ",
@@ -2719,15 +2717,9 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       "                                ",
       " @                              ",
       "__                              ",
-      "AB                              ",
-      "CD                              ",
-      "EF                      x       ",
-      "AB              0TTTTTTTTT      ",
-      "CD              1232323232      ",
-      "EF          x   4565656565      ",
-      "AB      0TTTTTTT9898989898      ",
-      "CD      123232323232323232      ",
-      "EF      456565656565656565      "
+      "AB    0TTTTTTTTTTTTTTTTTTTTTTT  ",
+      "CD    123232323232323232323232  ",
+      "EF    456565656565656565656565  "
     ],
     [
       "                                ",
@@ -2773,7 +2765,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     ],
     [
       "                                ",
-      "           o                    ",
+      "                                ",
       "                                ",
       "                                ",
       "                                ",
@@ -2794,44 +2786,22 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     [
       "                                ",
       "                                ",
-      "                                ",
-      "                                ",
-      "                          o     ",
-      "                                ",
-      "                                ",
-      "          o                      ",
+      "           o                    ",
       "                                ",
       "                                ",
       "                                ",
       "                                ",
+      "                  o             ",
       "                                ",
+      "                                ",
+      "                                ",
+      "                                ",
+      "        o                       ",
       "                        x       ",
-      "                 0TTTTTTTTT     ",
-      "                 1232323232     ",
-      " @               4565656565     ",
-      "__               7898989898     "
-    ],
-    [
-      "                                ",
-      "                                ",
-      "                                ",
-      "                                ",
-      "                                ",
-      "                          o     ",
-      "                                ",
-      "                                ",
-      "                                ",
-      "                                ",
-      " @                              ",
-      "__                              ",
-      "AB                              ",
-      "CD                              ",
-      "EF      x         x             ",
-      "AB   0TTTTTTTTTTTTTTTTTTTTTT    ",
-      "CD   12323232323232323232323    ",
-      "EF   45656565656565656565656    ",
-      "AB   78989898989898989898989    ",
-      "CD   12323232323232323232323    "
+      "                      0TTTT     ",
+      "                      12323     ",
+      " @                    45656     ",
+      "__                    78989     "
     ],
     [
       "                                ",
@@ -3027,10 +2997,9 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     });
   }, "registerTextActions");
   var addConversation = /* @__PURE__ */ __name((conversationKey, pause = 1, onEnd = () => {
-  }, hideOverlay = false) => {
+  }, hideOverlay = false, repeat) => {
     console.log("conversationKey", conversationKey);
-    if (state_default.pastConversations.has(conversationKey)) {
-      onEnd && onEnd();
+    if (!repeat && state_default.pastConversations.has(conversationKey)) {
       return;
     } else {
       if (state_default.conversationQueue.length > 0) {
@@ -3289,14 +3258,19 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     let direction = -1;
     action("flier", (flier) => {
       if (!flier.disabled) {
-        if (flier.pos.y < flier.startingHeight - HOVER_DISTANCE) {
-          direction = 1;
-        } else if (flier.pos.y > flier.startingHeight + HOVER_DISTANCE) {
-          direction = -1;
+        const player = get("player")[0];
+        if (flier.alerted && player && player.state === "launched") {
+          flier.moveTo(player.pos, 40);
+        } else {
+          if (flier.pos.y < flier.startingHeight - HOVER_DISTANCE) {
+            direction = 1;
+          } else if (flier.pos.y > flier.startingHeight + HOVER_DISTANCE) {
+            direction = -1;
+          }
+          const distanceFromStart = Math.abs(flier.startingHeight - flier.pos.y);
+          const speed = Math.abs(HOVER_DISTANCE - distanceFromStart);
+          flier.pos.y = flier.pos.y + direction * (1 + speed / 64) * speedModifier();
         }
-        const distanceFromStart = Math.abs(flier.startingHeight - flier.pos.y);
-        const speed = Math.abs(HOVER_DISTANCE - distanceFromStart);
-        flier.pos.y = flier.pos.y + direction * (1 + speed / 64) * speedModifier();
       }
     });
   }, "addFlierParts");
@@ -3362,6 +3336,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       collider.owner.unuse("mover");
       collider.owner.sideSpeed = 0;
       collider.owner.upSpeed = 0;
+      play("land");
       shake(10);
     });
     collides("playerLandCollider", "land", () => {
@@ -3392,6 +3367,11 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       enemy.thruster && enemy.thruster.destroy();
       shake(5);
       if (!wasPreviouslyDisabled) {
+        if (enemy.is("flier")) {
+          play("disabledFlier");
+        } else {
+          play("disabledTallbot");
+        }
         checkEnd();
       }
     });
@@ -3426,9 +3406,15 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         addScore(SCORES.KICK);
         kickable.color = COLORS.GREY;
         const kickDirection = player.pos.sub(kickable.pos).x;
-        if (kickable.curAnim() !== "kicked" && kickDirection - 1) {
+        if (kickable.curAnim() !== "kicked" && kickDirection < 0) {
           kickable.play("kicked", { loop: true });
+        } else {
+          kickable.play("disabled");
         }
+        play("kick");
+        wait(0.5, () => {
+          play("kicked");
+        });
         shake(10);
         wait(1, () => {
           kickable.kickDirection = kickDirection;
@@ -3503,7 +3489,6 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       opacity(0),
       z(3)
     ]);
-    bossLaser.play("main", { loop: true });
     const createLaserCollider = /* @__PURE__ */ __name(() => {
       add([
         "bossLaserCollider",
@@ -3669,6 +3654,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         }
       } else if (bossEye.disabled) {
         if (inPhase) {
+          play("bossDeath");
           endPhase();
         }
         if (bossHead.pos.y < rooftop.pos.y - 2 * UNITS) {
@@ -3715,7 +3701,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       console.log("here");
       if (bossEye.isShooting && !state_default.level.isRecovering) {
         state_default.level.energyCount--;
-        if (state_default.energyCount <= 0) {
+        if (state_default.level.energyCount <= 0) {
           wait(2, () => {
             go("continue");
           });
@@ -3814,7 +3800,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     if (args.reset) {
       softReset();
     }
-    play("mainGame", { loop: true });
+    let music = [];
     const startingLevel = (_a = args.level) != null ? _a : state_default.currentLevel;
     resetLevelState();
     let previousMouseDown;
@@ -3832,6 +3818,11 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     ], "game");
     const startLevel = /* @__PURE__ */ __name((newLevel) => {
       kaboom_default2.every((obj) => obj.destroy());
+      music.forEach((song) => {
+        song.stop && song.stop();
+      });
+      music = [];
+      music.push(play("mainGame", { loop: true }));
       state_default.currentBuilding = (state_default.currentBuilding + 1) % 3;
       const nextBuilding = (state_default.currentBuilding + 1) % 3;
       state_default.currentLevel = newLevel;
@@ -3862,6 +3853,12 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         layer("ui"),
         color(state_default.level.energyCount > 0 ? COLORS.WHITE : COLORS.RED)
       ]);
+      energyCounter.action(() => {
+        energyCounter.text = getEnergyCounterText();
+        if (state_default.level.energyCount === 0) {
+          energyCounter.color = COLORS.RED;
+        }
+      });
       ammoCounter = add([
         "ammoCounter",
         text(getAmmoCounterText(), { size: 24 }),
@@ -3869,6 +3866,12 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         layer("ui"),
         color(state_default.level.ammoCount > 0 ? COLORS.WHITE : COLORS.RED)
       ]);
+      ammoCounter.action(() => {
+        ammoCounter.text = getAmmoCounterText();
+        if (state_default.level.ammoCount === 0) {
+          ammoCounter.color = COLORS.RED;
+        }
+      });
       add([
         "sky",
         sprite("background"),
@@ -3884,8 +3887,20 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       overlay2.action(() => {
         if (state_default.level.isSlowMo) {
           overlay2.opacity = wave(0.25, 0.5, 1e3);
+          music.forEach((song) => {
+            song.speed && song.speed(0.75);
+          });
+          music.forEach((song) => {
+            song.volume && song.volume(0.75);
+          });
         } else {
           overlay2.opacity = 0.25;
+          music.forEach((song) => {
+            song.speed && song.speed(1);
+          });
+          music.forEach((song) => {
+            song.volume && song.volume(1);
+          });
         }
       });
       loadLevel_default(levels_default[state_default.currentLevel], state_default.currentBuilding, nextBuilding);
@@ -3966,6 +3981,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         addScore(SCORES.FALL);
       }
       if (state_default.level.energyCount > 0) {
+        play("teleport");
         reset();
       } else {
         destroyPlayer();
@@ -3973,8 +3989,9 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         launchArrow.destroy();
         addConversation("death", 0, () => {
           previousMouseDown = mouseIsDown();
+          music.forEach((song) => song.stop());
           go("continue");
-        });
+        }, false, true);
       }
     }, "attemptReset");
     const flashAmmo = /* @__PURE__ */ __name(() => {
@@ -3982,22 +3999,15 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     }, "flashAmmo");
     const useAmmo = /* @__PURE__ */ __name(() => {
       state_default.level.ammoCount -= 1;
-      ammoCounter.text = getAmmoCounterText();
-      if (state_default.level.ammoCount === 0) {
-        ammoCounter.color = COLORS.RED;
-      }
     }, "useAmmo");
     const useSmokeBomb = /* @__PURE__ */ __name(() => {
       state_default.level.energyCount -= 1;
-      energyCounter.text = getEnergyCounterText();
-      if (state_default.level.energyCount === 0) {
-        energyCounter.color = COLORS.RED;
-      }
     }, "useSmokeBomb");
     const startThrow = /* @__PURE__ */ __name(() => {
       console.log("callingStartThrow");
       const player = get("player")[0];
       const throwArrow = get("throwArrow")[0];
+      play("slowMo", { seek: 0.25 });
       player.isThrowing = true;
       state_default.level.isSlowMo = true;
       throwArrow.opacity = 1;
@@ -4015,6 +4025,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       player.play("throwing");
       const throwArrow = get("throwArrow")[0];
       const bladePos = throwArrow.pos.add(dir(throwArrow.angle - 90).scale(BLADE_START_DISTANCE));
+      play("throw");
       add([
         "blade",
         sprite("kunai"),
@@ -4037,12 +4048,17 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         return;
       }
       const player = get("player")[0];
-      if (player.state === "launched" && !player.isThrowing && !player.isKicking && !state_default.level.isRecovering) {
+      if (player && player.state === "launched" && !player.isThrowing && !player.isKicking && !state_default.level.isRecovering) {
         state_default.level.ammoCount > 0 ? startThrow() : flashAmmo();
-      } else if (player.isThrowing) {
+      } else if (player && player.isThrowing) {
         state_default.level.ammoCount > 0 ? throwBlade() : flashAmmo();
       } else if (state_default.level.isWon) {
-        if (state_default.currentLevel + 1 === levels_default.length) {
+        music.forEach((song) => song.stop());
+        if (state_default.currentLevel + 1 === levels_default.length - 1) {
+          state_default.currentLevel + 1;
+          music;
+          go("cinematic");
+        } else if (state_default.currentLevel + 1 === levels_default.length) {
           go("win");
         } else {
           startLevel(state_default.currentLevel + 1);
@@ -4051,7 +4067,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     }, "gameAction");
     const actionDown = /* @__PURE__ */ __name(() => {
       const player = get("player")[0];
-      if (player.state === "prelaunch" && !state_default.level.isRecovering) {
+      if (player && player.state === "prelaunch" && !state_default.level.isRecovering) {
         player.state = "launching";
       }
     }, "actionDown");
@@ -4059,6 +4075,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       const player = get("player")[0];
       if (player.state === "launching") {
         player.state = "launched";
+        play("jump");
         const start = vec2(0, 0);
         const direction2 = state_default.level.isBossBattle ? 90 : LAUNCH_ARROW_MAX_ANGLE - launchArrow.angle;
         const end = start.add(dir(direction2).scale(launchArrow.scale.scale(LAUNCH_ARROW_STRENGTH_MODIFIER)));
@@ -4095,6 +4112,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       }
     });
     const winLevel = /* @__PURE__ */ __name(() => {
+      music.forEach((song) => song.stop());
       wait(1, () => {
         destroyAll("blade");
         let delay = 0;
@@ -4108,6 +4126,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         });
       });
       wait(2, () => {
+        music.push(play("upbeat", { loop: true }));
         const stats = add([
           rect(10 * UNITS, 6 * UNITS),
           area(),
@@ -4132,18 +4151,19 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
             pos(stats.pos.x, stats.pos.y + 4 * UNITS),
             layer("ui")
           ]);
-          shake(20);
           state_default.level.isWon = true;
         });
       });
     }, "winLevel");
     const incompleteLevel = /* @__PURE__ */ __name(() => {
       wait(1, () => {
+        play("alert");
         every("enemy", (enemy) => {
           if (!enemy.disabled && !state_default.level.isBossBattle) {
             if (enemy.eye) {
               enemy.eye.frame = 8;
             }
+            enemy.alerted = true;
           }
         });
       });
@@ -4158,6 +4178,9 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     }, "incompleteLevel");
     const checkEnd = /* @__PURE__ */ __name(() => {
       const player = get("player")[0];
+      if (!player) {
+        return;
+      }
       let isEnded = player.state === "landed";
       every("blade", (blade) => {
         if (blade.speed > 0) {
@@ -4309,12 +4332,16 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         cta.opacity = 0;
       }
     });
-    play("bigHit");
-    mouseClick(() => kaboom_default2.go("game"));
+    const sound = play("bigHit");
+    mouseClick(() => {
+      sound.stop();
+      kaboom_default2.go("game");
+    });
   });
 
   // code/scenes/win.js
   kaboom_default2.scene("win", (args = {}) => {
+    const music = play("win", { loop: true });
     add([
       "background",
       rect(width(), height()),
@@ -4350,7 +4377,10 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         cta.opacity = 0;
       }
     });
-    mouseClick(() => kaboom_default2.go("game"));
+    mouseClick(() => {
+      music.stop();
+      kaboom_default2.go("game", { reset: true });
+    });
   });
 
   // code/scenes/gameOver.js
@@ -4447,7 +4477,9 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
 
   // code/scenes/intro.js
   kaboom_default2.scene("intro", (args = {}) => {
-    let isAnimating = true;
+    let isAnimating = false;
+    let started = false;
+    let audioQueue = [];
     const background = add([
       sprite("background"),
       scale(0.5),
@@ -4497,7 +4529,6 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
       origin("bot"),
       follow(bottomBar, vec2(0, -4 * UNITS))
     ]);
-    const introSong = play("intro", { loop: true });
     action(() => {
       if (isAnimating) {
         bottomBar.pos.y += 0.75;
@@ -4505,10 +4536,32 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         if (bottomBar.pos.y >= 8 * UNITS) {
           isAnimating = false;
           addConversation("intro", 2, () => {
-            introSong.stop();
+            audioQueue[0].stop();
             go("title");
           }, true);
         }
+      }
+    });
+    const cta = add([
+      "cta",
+      text("Click to begin", { size: 30 }),
+      pos(31 * UNITS, 17 * UNITS),
+      origin("right"),
+      opacity(0)
+    ]);
+    loop(0.75, () => {
+      if (cta.opacity === 0) {
+        cta.opacity = 1;
+      } else {
+        cta.opacity = 0;
+      }
+    });
+    mouseClick(() => {
+      if (!started) {
+        isAnimating = true;
+        audioQueue.push(play("intro", { loop: true }));
+        cta.destroy();
+        started = true;
       }
     });
     registerTextActions();
@@ -4521,8 +4574,9 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     const landId = (_b = args.landId) != null ? _b : 1;
     let isRising = false;
     let maestro = -1;
+    let music = [];
+    music.push(play("mainGame", { loop: true }));
     const heightModifer = -1.75 * UNITS;
-    play("mainGame", { loop: true });
     add([
       "sky",
       sprite("background"),
@@ -4627,11 +4681,11 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
     addFade(true, () => {
       addConversation("bossCinematic1", 1, () => {
         shake(20);
-        play("explosion");
+        play("bass");
         addConversation("bossCinematic2", 0.5, () => {
           wait(1, () => {
             shake(20);
-            play("explosion");
+            play("bass");
             wait(2, () => {
               maestro = 0;
               play("handRaise");
@@ -4663,7 +4717,7 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         leftHand.moveTo(leftDownPos, 1200);
         if (leftHand.pos.eq(leftDownPos)) {
           maestro = 2;
-          play("explosion");
+          play("bass");
           shake(10);
           character.play("landing");
         }
@@ -4684,16 +4738,16 @@ vec4 frag(vec3 pos, vec2 uv, vec4 color, sampler2D tex) {
         const rightDownPos = vec2(22 * UNITS, rooftop.pos.y + heightModifer);
         rightHand.moveTo(rightDownPos, 1200);
         if (rightHand.pos.eq(rightDownPos)) {
-          play("explosion");
+          play("bass");
           maestro = 6;
           shake(10);
           isRising = true;
-          play("rising");
           addConversation("bossCinematic4", 1, () => {
             maestro = 5;
           }, true);
         }
       } else if (maestro === 5 && !isRising) {
+        music.forEach((song) => song.stop());
         go("game", { level: levels_default.length - 1 });
       }
     });

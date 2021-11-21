@@ -6,6 +6,7 @@ export const registerCollisions = ({ endThrow, checkEnd }) => {
       collider.owner.unuse("mover");
       collider.owner.sideSpeed = 0;
       collider.owner.upSpeed = 0;
+      play("land");
       shake(10);
   });
 
@@ -39,6 +40,11 @@ export const registerCollisions = ({ endThrow, checkEnd }) => {
     enemy.thruster && enemy.thruster.destroy();
     shake(5);
     if (!wasPreviouslyDisabled) {
+      if (enemy.is("flier")) {
+        play("disabledFlier");
+      } else {
+        play("disabledTallbot")
+      }
       checkEnd();
     }
   });
@@ -77,9 +83,13 @@ export const registerCollisions = ({ endThrow, checkEnd }) => {
       addScore(SCORES.KICK);
       kickable.color = COLORS.GREY;
       const kickDirection = player.pos.sub(kickable.pos).x;
-      if (kickable.curAnim() !== "kicked" && kickDirection - 1) {
+      if (kickable.curAnim() !== "kicked" && kickDirection < 0) {
         kickable.play("kicked", { loop: true })
+      } else {
+        kickable.play("disabled");
       }
+      play("kick");
+      wait(0.5, () => { play("kicked" )})
       shake(10);
       wait(1, () => {
         kickable.kickDirection = kickDirection;

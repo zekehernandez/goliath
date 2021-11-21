@@ -4,6 +4,8 @@ import { UNITS } from '../constants';
 import state from '../state';
 
 k.scene("win", (args = {}) => {
+  const music = play("win", { loop: true });
+
   add([
     "background",
     rect(width(), height()),
@@ -45,5 +47,8 @@ k.scene("win", (args = {}) => {
     }
   });
 
-  mouseClick(() => k.go("game"))
+  mouseClick(() => {
+    music.stop();
+    k.go("game", { reset: true });    
+  }); 
 });

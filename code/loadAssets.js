@@ -144,12 +144,24 @@ const loadAssets = () => {
   k.loadSound("disabledFlier", "sounds/disabled-flier.wav");
   k.loadSound("disabledTallbot", "sounds/disabled-tallbot.wav");
   k.loadSound("mainGame", "sounds/main_game.mp3");
-  k.loadSound("bossMoving", "sounds/moving.wav");
+  k.loadSound("bossMoving", "sounds/moving_2.wav");
   k.loadSound("rising", "sounds/rising.wav");
   k.loadSound("hit", 'sounds/hit.wav');
-  k.loadSound("handRaise", "sounds/hit.wav");
   k.loadSound("charging", "sounds/charging.wav");
   k.loadSound("laser", "sounds/laser.wav");
+  k.loadSound("kick", "sounds/kick.wav");
+  k.loadSound("siren", "sounds/siren.wav");
+  k.loadSound("throw", "sounds/throw2.wav");
+  k.loadSound("land", "sounds/land.wav");
+  k.loadSound("jump", "sounds/jump.wav");
+  k.loadSound("slowMo", "sounds/slowMo.wav");
+  k.loadSound("alert", "sounds/alert.wav");
+  k.loadSound("teleport", "sounds/teleport.wav");
+  k.loadSound("upbeat", "sounds/upbeat.mp3")
+  k.loadSound("kicked", "sounds/kicked.wav");
+  k.loadSound("handRaise", "sounds/hand_raise.wav");
+  k.loadSound("bass", "sounds/bass.wav");
+  k.loadSound("win", "sounds/win.mp3");
 };
 
 export default loadAssets;
