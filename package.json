@@ -3,10 +3,14 @@
 	"dependencies": {
 		"@replit/database": "^2.0.1",
 		"chokidar": "^3.5.2",
-		"esbuild": "^0.12.19",
+		"esbuild": "^0.12.29",
 		"express": "^4.17.1",
 		"kaboom": "2000.0.0-beta.24",
 		"stacktrace-js": "^2.0.2",
 		"ws": "^8.2.0"
+	},
+	"scripts": {
+		"start": "node run.js",
+		"build": "rm -rf ./build && node scripts/build.js && cp -R ./public/. build/"
 	}
 }
