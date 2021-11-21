@@ -68,7 +68,6 @@ export const registerCollisions = ({ endThrow, checkEnd }) => {
 
   collides("player", "flierHurtbox", (player, flierHurtbox) => {
     const flier = flierHurtbox.owner;
-    console.log('flier');
     if (!flier.disabled) {
       shake(10);
       player.sideSpeed = 0;

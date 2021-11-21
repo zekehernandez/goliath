@@ -36,7 +36,7 @@ export const registerTextActions = () => {
 }
 
 export const addConversation = (conversationKey, pause = 1, onEnd = () => {}, hideOverlay = false, repeat) => {
-  console.log('conversationKey', conversationKey)
+  // console.log('conversationKey', conversationKey)
 
   if (!repeat && state.pastConversations.has(conversationKey)) {
     return;
@@ -55,7 +55,7 @@ export const addConversation = (conversationKey, pause = 1, onEnd = () => {}, hi
     const panelHeight = 4*UNITS
     const conversation = conversations[conversationKey];
     if (!conversation) {
-      console.log('no conversation found for ', conversationKey);
+      // console.log('no conversation found for ', conversationKey);
       state.isPaused = false;
       return;
     }
@@ -111,7 +111,6 @@ export const addConversation = (conversationKey, pause = 1, onEnd = () => {}, hi
           // dequeue this convo then check for more
           state.conversationQueue.shift();
           if (state.conversationQueue.length > 0) {
-            console.log("here?");
             const newConversation = state.conversationQueue.shift();
             
             addConversation(newConversation.conversationKey, newConversation.pause, newConversation.onEnd, newConversation.hideOverlay);

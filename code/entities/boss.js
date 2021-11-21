@@ -308,7 +308,6 @@ export const createBoss = () => {
   });
 
   collides("bossLaserCollider", "player", (bossLaserCollider, player) => {
-    console.log('here')
     if (bossEye.isShooting && !state.level.isRecovering) {
       state.level.energyCount--;
 

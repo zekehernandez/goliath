@@ -296,7 +296,7 @@ music.forEach(song => {song.speed && song.speed(1)});
 
   // throwing
   const startThrow = () => {
-    console.log('callingStartThrow');
+    // console.log('callingStartThrow');
     const player = get("player")[0];
     const throwArrow = get("throwArrow")[0];
     play("slowMo", { seek: 0.25});
@@ -311,7 +311,7 @@ music.forEach(song => {song.speed && song.speed(1)});
     throwArrow.opacity = 0;
     throwArrow.angle = 0;
     player.isThrowing = false;
-    console.log('what is happening?', player.isThrowing)
+    // console.log('what is happening?', player.isThrowing)
     state.level.isSlowMo = false;
   }
   const throwBlade = () => {
@@ -549,7 +549,6 @@ music.forEach(song => {song.speed && song.speed(1)});
   // launch arrow movement
   let direction = 1;
   action("launchArrow", launchArrow => {
-    console.log(state.isPaused)
     if (state.isPaused) {
       return;
     }
