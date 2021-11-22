@@ -8,7 +8,7 @@ esbuild.buildSync({
   keepNames: true,
   logLevel: "silent",
   entryPoints: ["code/main.js"],
-  outfile: "dist/game.js",
+  outfile: "build/game.js",
 });
 
 esbuild.buildSync({
@@ -17,5 +17,5 @@ esbuild.buildSync({
   target: "es6",
   keepNames: true,
   entryPoints: ["helper.ts"],
-  outfile: "dist/helper.js",
+  outfile: "build/helper.js",
 });
