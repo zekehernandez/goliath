@@ -3,9 +3,9 @@ const esbuild = require("esbuild");
 // build user code
 esbuild.buildSync({
   bundle: true,
-  sourcemap: true,
+  sourcemap: false,
   target: "es6",
-  keepNames: true,
+  keepNames: false,
   logLevel: "silent",
   entryPoints: ["code/main.js"],
   outfile: "build/game.js",
@@ -13,9 +13,9 @@ esbuild.buildSync({
 
 esbuild.buildSync({
   bundle: true,
-  sourcemap: true,
+  sourcemap: false,
   target: "es6",
-  keepNames: true,
+  keepNames: false,
   entryPoints: ["helper.ts"],
   outfile: "build/helper.js",
 });
